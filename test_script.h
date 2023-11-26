@@ -25,7 +25,7 @@ bool validate_sparse_set(ecs::pool<t>& pl, std::vector<ecs::entity>& alive, std:
 	out &= pass;
 
 	pass = true;
-	for (auto it = dead.begin(); it != dead.end(); ++it) if (pl.sparse.at(*it) != ecs::util::tombstone) {
+	for (auto it = dead.begin(); it != dead.end(); ++it) if (pl.sparse.at(*it) != util::tombstone) {
 		pass = false; 
 		std::cout << "        " << *it << " is dead but is found at " << pl.sparse.at(*it) << std::endl;
 	} 
@@ -155,7 +155,7 @@ bool valid2(ecs::pool<t>& pl) {
 	if (!test1) std::cout << "entity in packed is not in sparse" << std::endl;
 	
 	bool test2 = std::all_of(std::execution::par, pl.sparse.pages, pl.sparse.pages + pl.sparse.page_count, [&](size_t* page) {
-		return (page == nullptr) || std::all_of(page, page + ecs::util::sparse_map::page_size, [&](size_t i) { 
+		return (page == nullptr) || std::all_of(page, page + util::sparse_map::page_size, [&](size_t i) { 
 			return i == -1 || (i < pl.capacity && pl.sparse[pl.packed[i]] == i);
 		});
 	});

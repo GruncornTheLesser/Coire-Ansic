@@ -12,9 +12,9 @@ struct D { };
 int main() {
 	using namespace ecs;
 
-	ecs::registry reg;
-
-	
+	ecs::registry<A, B, C> reg;
+	pipeline<const A, const B> pip{ &reg };
+	pipeline<const A, const B> pip{ &reg };
 
 }
 

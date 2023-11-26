@@ -1,8 +1,9 @@
 #pragma once
-#include <unordered_map>
+#include <map>
 #include <functional>
 #include <typeindex>
 #include <memory>
+// NOTE: its a bit unsafe but it should be in spec that typeid is unique to a type 
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdelete-incomplete"
@@ -20,11 +21,11 @@ namespace util {
 		u& get_or_emplace(arg_ts ... args) {
 			std::type_index key = typeid(u);
 
-			auto it = m_data.find(key);
-			if (it == m_data.end()) 
+			auto it = data.find(key);
+			if (it == data.end()) 
 			{
 				void* elem = new u{ args... };
-				it = m_data.emplace_hint(it, std::pair(key, elem));
+				it = data.emplace_hint(it, std::pair(key, elem));
 			}
 
 			return *reinterpret_cast<u*>(it->second.get());
@@ -32,21 +33,26 @@ namespace util {
 
 		template<typename u>
 		u& get() const {
-			return *reinterpret_cast<u*>(m_data.at(typeid(u)).get());
+			return *reinterpret_cast<u*>(data.at(typeid(u)).get());
 		}
 
 		template<typename u>
 		void erase() {
-			m_data.erase(typeid(u));
+			data.erase(typeid(u));
 		}
 
 		template<typename u>
 		bool contains() const {
-			return m_data.contains(typeid(u));
+			return data.contains(typeid(u));
+		}
+
+		template<typename u>
+		size_t index() const {
+			return std::distance(data.cbegin(), data.find(typeid(u)));
 		}
 
 	private:
-		std::unordered_map<std::type_index, erased_ptr> m_data;
+		std::map<std::type_index, erased_ptr> data;
 	};
 }
 #pragma GCC diagnostic pop

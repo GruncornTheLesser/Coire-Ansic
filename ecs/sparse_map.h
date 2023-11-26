@@ -3,12 +3,12 @@
 #include <exception>
 #include "fwd.h"
 
-namespace ecs::util {
+namespace util {
 	constexpr size_t tombstone = -1;
 
-	struct sparse_map {
-		static constexpr size_t page_size = 4096;
-        
+	class sparse_map {
+	public:
+		
         sparse_map(size_t new_page_count = 8) : page_count(new_page_count) {
 			pages = std::allocator<size_t*>().allocate(page_count);
 			std::fill(pages, pages + page_count, nullptr);
@@ -21,13 +21,13 @@ namespace ecs::util {
 			std::allocator<size_t*>().deallocate(pages, page_size);
 		}
 		
-		size_t& operator[](entity entity) {
+		size_t& operator[](ecs::entity entity) {
 			size_t page_index = entity / page_size;			
 			size_t elem_index = entity % page_size; 
 			return assure_page(page_index)[elem_index];
 		}
 
-		const size_t& operator[](entity entity) const {
+		const size_t& operator[](ecs::entity entity) const {
 			size_t page_index = entity / page_size;
 			size_t elem_index = entity % page_size;
 			
@@ -37,7 +37,7 @@ namespace ecs::util {
 			return pages[page_index][elem_index];
 		} 
 		
-		size_t& at(entity entity) {
+		size_t& at(ecs::entity entity) {
 			size_t page_index = entity / page_size;
 			size_t elem_index = entity % page_size;
 			if (page_index > page_count || pages[page_index] == nullptr) 
@@ -45,7 +45,7 @@ namespace ecs::util {
 			return pages[page_index][elem_index];
 		}
 
-		size_t at(entity entity) const {
+		size_t at(ecs::entity entity) const {
 			size_t page_index = entity / page_size;
 			size_t elem_index = entity % page_size;
 			if (page_index > page_count || pages[page_index] == nullptr) 
@@ -53,7 +53,7 @@ namespace ecs::util {
 			return pages[page_index][elem_index];
 		}
 
-		void reserve(entity entity) {
+		void reserve(ecs::entity entity) {
 			assure_page(entity / page_size);
 		}
 
@@ -61,7 +61,7 @@ namespace ecs::util {
 			return page_count * page_size;
 		}
 		
-		bool contains(entity entity) const {
+		bool contains(ecs::entity entity) const {
 			size_t page_index = entity / page_size;
 			size_t elem_index = entity % page_size;
 			return page_index <= page_count && pages[page_index] != nullptr && pages[page_index][elem_index] != tombstone;
@@ -93,7 +93,9 @@ namespace ecs::util {
 			
 			return page;
 		}
-
+	
+		static constexpr size_t page_size = 4096;
+	
 		size_t** 	pages;
 		size_t  	page_count;
 	};
