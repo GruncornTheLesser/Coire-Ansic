@@ -1,6 +1,6 @@
 #pragma once
-#include<tuple>
-
+#include <tuple>
+#include "tuple_util.h"
 
 namespace ecs {
     using entity = unsigned long int;
@@ -32,7 +32,11 @@ namespace ecs::traits {
 	template<typename t, typename comp> concept component_interface = is_component_interface<t, comp>::value;
 	template<typename t, typename comp> concept policy_class = is_pool_policy<t, comp>::value;
 
-    template<typename ... ts> struct pipeline_info;
+    template<typename t> struct component_id;
+
+    template<typename t, typename u> struct component_sort;
+	template<typename ... ts> struct pipeline_builder;
+
 }
     
 namespace ecs::pool_policy {
@@ -109,7 +113,7 @@ namespace ecs {
 }
 
 namespace ecs::traits {
-    template<typename t> struct is_component : std::true_type { }; // TODO: update when component definitions change. component = not ecs type???
+    template<typename t> struct is_component : std::bool_constant<!std::is_void_v<component_id<t>>> { }; 
     template<> struct is_component<entity> : std::false_type { };
     
     template<typename t> struct is_component<const t> : is_component<t> { };
@@ -126,23 +130,18 @@ namespace ecs::traits {
             std::is_same_v<decltype(t::deallocate_at(std::declval<ecs::pool<comp_t>&>(), 0, 0)), void>;
     };
 
-    // NOTE: could instead denote mutable with & instead of const with const
-    // this would simplify the error messages some what
-
-    template<typename t, typename comp_t> struct is_component_interface : std::false_type { };
+    template<typename t, typename comp_t> struct is_component_interface : std::false_type { };    
     template<typename t, typename comp_t> struct is_component_interface<t&, comp_t> : is_component_interface<t, comp_t> { };
 
-    template<typename comp_t> struct is_component_interface<const pool<comp_t>, const comp_t> : std::true_type { };
-    template<typename comp_t> struct is_component_interface<      pool<comp_t>, const comp_t> : std::true_type { };
-    template<typename comp_t> struct is_component_interface<      pool<comp_t>,       comp_t> : std::true_type { };
+    template<typename comp_t> struct is_component_interface<const comp_t, const comp_t> : std::true_type { };
+    template<typename comp_t> struct is_component_interface<      comp_t, const comp_t> : std::true_type { };
+    template<typename comp_t> struct is_component_interface<      comp_t,       comp_t> : std::true_type { };
     
-    template<typename ... pre_ts, typename ... post_ts, typename comp_t> struct is_component_interface<pipeline<pre_ts..., const comp_t, post_ts...>, const comp_t> { };
-    template<typename ... pre_ts, typename ... post_ts, typename comp_t> struct is_component_interface<pipeline<pre_ts...,       comp_t, post_ts...>, const comp_t> { };
-    template<typename ... pre_ts, typename ... post_ts, typename comp_t> struct is_component_interface<pipeline<pre_ts...,       comp_t, post_ts...>,       comp_t> { };
+    template<typename ... ts, typename comp_t> struct is_component_interface<pool<ts...>,     comp_t> : std::bool_constant<(is_component_interface<ts, comp_t>::value || ...)> { };
+    template<typename ... ts, typename comp_t> struct is_component_interface<pipeline<ts...>, comp_t> : std::bool_constant<(is_component_interface<ts, comp_t>::value || ...)> { };
 
-    template<typename ... pre_ts, typename ... post_ts, typename comp_t> struct is_component_interface<view<pre_ts..., const comp_t, post_ts...>, const comp_t> { };
-    template<typename ... pre_ts, typename ... post_ts, typename comp_t> struct is_component_interface<view<pre_ts...,       comp_t, post_ts...>, const comp_t> { };
-    template<typename ... pre_ts, typename ... post_ts, typename comp_t> struct is_component_interface<view<pre_ts...,       comp_t, post_ts...>,       comp_t> { };
+    template<typename t> struct component_id  { static constexpr int value = t::component_id; };
 
-    
+    template<typename t, typename u> struct component_sort { static constexpr bool value = component_id<t>::value < component_id<t>::value; };
+	template<typename ... ts> struct pipeline_builder : utility::tuple_extract<typename utility::tuple_sort<std::tuple<ts...>, component_sort>::type, pipeline> { };
 }

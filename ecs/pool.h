@@ -5,28 +5,22 @@
 #include "sparse_map.h"
 #include "next_pow2.h"
 
-
 namespace ecs {
     template<traits::component_class comp_t>
     class pool {
-        template<traits::component_class ... ts> friend class pipeline;
-        friend class pool_policy::back;
         friend class pool_policy::immediate_swap;
         friend class pool_policy::immediate_inplace;
         friend class pool_policy::deferred_swap;
         friend class pool_policy::deferred_inplace;
-                
-        
-            
+        using mutex_t = std::shared_mutex;
+        using sparse_t = util::sparse_map;
+        using return_t = std::conditional_t<std::is_empty_v<comp_t>, void, comp_t&>;
     public:
         pool(size_t cap = 8) : packed(std::allocator<entity>().allocate(cap)), capacity(cap), size(0) { 
             if constexpr (!std::is_empty_v<comp_t>)
                 buffer = std::allocator<comp_t>().allocate(cap);
         }
         ~pool() {
-            //NOTE: must execute deferred
-            
-    
             if constexpr (!std::is_empty_v<comp_t>)
             {
                 std::for_each(buffer, buffer + size, [&](comp_t& curr) { std::destroy_at(&curr); });
@@ -72,10 +66,14 @@ namespace ecs {
             capacity = new_capacity;
         }
 
-        void acquire() { mtx.lock(); }
-        void acquire() const { mtx.lock_shared(); }
-        void release() { mtx.unlock(); }
-        void release() const { mtx.unlock_shared(); }
+        void lock() { mtx.lock(); }
+        void lock() const { mtx.lock_shared(); }
+        
+        void unlock() { mtx.unlock(); }
+        void unlock() const { mtx.unlock_shared(); }
+        
+        bool try_lock() { return mtx.try_lock(); }
+        bool try_lock() const { return mtx.try_lock_shared(); }
 
         template<typename pol = pool_policy::back, typename ... arg_ts>
         return_t emplace_back(entity e, arg_ts&& ... args) {
@@ -113,7 +111,7 @@ namespace ecs {
             if constexpr (!std::is_empty_v<comp_t>)
                 std::for_each(buffer + new_back, buffer + back, [&](comp_t& curr) { std::destroy_at(&curr); });
             
-            std::for_each(packed + new_back, packed + back, [&](entity e) { sparse[e] = ecs::util::tombstone; });
+            std::for_each(packed + new_back, packed + back, [&](entity e) { sparse[e] = util::tombstone; });
 
             pol::deallocate(*this, count);
         }
@@ -149,7 +147,7 @@ namespace ecs {
             if constexpr (!std::is_empty_v<comp_t>)
                 std::destroy_at(buffer + index);
             
-            sparse[e] = ecs::util::tombstone;
+            sparse[e] = util::tombstone;
 
             pol::deallocate_at(*this, index, 1);
         }
@@ -166,7 +164,7 @@ namespace ecs {
             if constexpr (!std::is_empty_v<comp_t>)
                 std::for_each(buffer + i, buffer + i + count, [&](comp_t& curr) { std::destroy_at(&curr); });
             
-            sparse[packed[i]] = ecs::util::tombstone;
+            sparse[packed[i]] = util::tombstone;
 
             pol::deallocate_at(*this, i, count);
         }

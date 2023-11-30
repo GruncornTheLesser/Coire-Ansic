@@ -4,17 +4,25 @@
 #include "ecs/pipeline.h"
 #include "ecs/pool_policy.h"
 
-struct A { };
-struct B { };
-struct C { };
-struct D { };
+#define SET_COMPONENT_ID public: static constexpr int component_id = __COUNTER__; 
+
+struct A { SET_COMPONENT_ID };
+struct B { SET_COMPONENT_ID };
+struct C { SET_COMPONENT_ID };
+struct D { SET_COMPONENT_ID };
+
+namespace ecs::traits {
+
+}
 
 int main() {
 	using namespace ecs;
 
-	ecs::registry<A, B, C> reg;
-	pipeline<const A, const B> pip{ &reg };
-	pipeline<const A, const B> pip{ &reg };
+	ecs::registry reg;
+	auto pip = reg.pipeline<const A, const B>();
+	pip.lock();
+	pip.unlock();
+	
 
 }
 
