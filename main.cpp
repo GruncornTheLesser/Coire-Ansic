@@ -20,9 +20,9 @@ int main() {
 
 	ecs::registry reg;
 	auto pip = reg.pipeline<const A, const B>();
-	pip.lock();
-	pip.unlock();
-	
-
+	{
+		std::lock_guard guard(pip);
+		
+	}
 }
 

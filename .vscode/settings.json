@@ -60,6 +60,8 @@
         "istream": "cpp",
         "charconv": "cpp",
         "format": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "cstdarg": "cpp",
+        "map": "cpp"
     }
 }

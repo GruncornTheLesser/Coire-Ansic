@@ -12,16 +12,13 @@ namespace ecs {
         using pool_t = std::conditional_t<std::is_const_v<t>, const pool<t>, pool<t>>*;
     public:
         pipeline(registry* reg) { 
-            reg->lock();
+            std::lock_guard guard(*reg);
             pools = std::tuple{ &reg->pool<ts>()... };            
-            reg->unlock();
         }
 
         pipeline(const registry* reg) { 
-            reg->lock();
-            std::lock_guard<const resource> guard{ reg };
+            std::lock_guard guard(*reg);
             pools = std::tuple{ &reg->pool<ts>() ... };
-            reg->unlock();
         }
 
         void lock() {
