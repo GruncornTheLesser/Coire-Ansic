@@ -1,8 +1,9 @@
 #pragma once
 #include "fwd.h"
 #include "any_set.h"
+#include "resource.h"
 namespace ecs {
-    class registry {
+    class registry : public resource {
         template<traits::component_class ... ts>
         friend class pipeline;
     public:

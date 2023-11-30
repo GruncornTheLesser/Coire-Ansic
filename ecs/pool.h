@@ -1,18 +1,17 @@
 #pragma once
-#include <shared_mutex>
 #include <algorithm>
 #include "fwd.h"
 #include "sparse_map.h"
 #include "next_pow2.h"
+#include "resource.h"
 
 namespace ecs {
     template<traits::component_class comp_t>
-    class pool {
+    class pool : public resource {
         friend class pool_policy::immediate_swap;
         friend class pool_policy::immediate_inplace;
         friend class pool_policy::deferred_swap;
         friend class pool_policy::deferred_inplace;
-        using mutex_t = std::shared_mutex;
         using sparse_t = util::sparse_map;
         using return_t = std::conditional_t<std::is_empty_v<comp_t>, void, comp_t&>;
     public:
@@ -65,15 +64,6 @@ namespace ecs {
             
             capacity = new_capacity;
         }
-
-        void lock() { mtx.lock(); }
-        void lock() const { mtx.lock_shared(); }
-        
-        void unlock() { mtx.unlock(); }
-        void unlock() const { mtx.unlock_shared(); }
-        
-        bool try_lock() { return mtx.try_lock(); }
-        bool try_lock() const { return mtx.try_lock_shared(); }
 
         template<typename pol = pool_policy::back, typename ... arg_ts>
         return_t emplace_back(entity e, arg_ts&& ... args) {
@@ -176,7 +166,5 @@ namespace ecs {
 
         size_t   capacity;
         size_t   size;
-
-        mutable mutex_t mtx;
     };
 }
