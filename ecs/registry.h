@@ -8,22 +8,17 @@ namespace ecs {
         friend class pipeline;
     public:
         template<traits::component_class u>
-        ecs::pool<u>& pool() {
-            return pools.get_or_emplace<ecs::pool<u>>();
+        ecs::traits::pool_builder<u>& pool() {
+            return pools.get_or_emplace<ecs::pool<std::remove_const_t<u>>>();
         }
         template<traits::component_class u>
-        const ecs::pool<u>& pool() const {
-            return pools.get<ecs::pool<u>>();
+        ecs::traits::pool_builder<u>& pool() const {
+            return pools.get<ecs::pool<std::remove_const_t<u>>>();
         }
 
         template<traits::component_class ... us>
         auto pipeline() {
-            return typename ecs::traits::pipeline_builder<us...>::type{ this };
-        }
-
-        template<traits::view_class ... us>
-        ecs::view<us...>& view() {
-            return ecs::view<us...>(this);
+            return typename ecs::traits::pipeline_builder<us...>{ this };
         }
 
     private:

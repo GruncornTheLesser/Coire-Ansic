@@ -43,5 +43,18 @@ namespace util {
     template<typename ... ts, template<typename...> typename t>
     struct tuple_extract<std::tuple<ts...>, t> { 
         using type = t<ts...>;
-    };
+	};
+	
+	template<typename tup, template<typename...> typename pred, typename ... args>
+	struct tuple_find;
+
+	template<typename t, typename ... ts, template<typename...> typename pred, typename ... args>
+	struct tuple_find<std::tuple<t, ts...>, pred, args...> {
+		using type = std::conditional_t<pred<t, args...>::value, t, typename tuple_find<std::tuple<ts...>, pred, args...>::type>;
+	};
+
+	template<template<typename...> typename pred, typename ... args>
+	struct tuple_find<std::tuple<>, pred, args...> {
+		using type = std::exception;
+	};
 }

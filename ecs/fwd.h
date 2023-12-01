@@ -1,6 +1,7 @@
 #pragma once
 #include <tuple>
 #include "tuple_util.h"
+#include <type_traits>
 
 namespace ecs {
     using entity = unsigned long int;
@@ -34,9 +35,8 @@ namespace ecs::traits {
 
     template<typename t> struct component_id;
 
-    template<typename t, typename u> struct component_sort;
-	template<typename ... ts> struct pipeline_builder;
-
+    template<typename t, typename u> struct component_compare_less_than;
+    template<typename t, typename u> struct component_compare_equal;
 }
     
 namespace ecs::pool_policy {
@@ -113,8 +113,7 @@ namespace ecs {
 }
 
 namespace ecs::traits {
-    template<typename t> struct is_component : std::bool_constant<!std::is_void_v<component_id<t>>> { }; 
-    template<> struct is_component<entity> : std::false_type { };
+    template<typename t> struct is_component : std::bool_constant<!std::is_void_v<component_id<t>>> { };
     
     template<typename t> struct is_component<const t> : is_component<t> { };
     
@@ -142,6 +141,11 @@ namespace ecs::traits {
 
     template<typename t> struct component_id  { static constexpr int value = t::component_id; };
 
-    template<typename t, typename u> struct component_sort { static constexpr bool value = component_id<t>::value < component_id<t>::value; };
-	template<typename ... ts> struct pipeline_builder : util::tuple_extract<typename util::tuple_sort<std::tuple<ts...>, component_sort>::type, pipeline> { };
+    template<typename t, typename u> struct component_compare_less_than : std::bool_constant<(component_id<t>::value < component_id<u>::value)> { };
+    template<typename t, typename u> struct component_compare_equal : std::bool_constant<(component_id<t>::value == component_id<u>::value)> { };
+
+    template<typename t> using pool_builder = std::conditional_t<std::is_const_v<t>, const pool<std::remove_const_t<t>>, pool<t>>;
+    template<typename ... ts> using pipeline_builder = util::tuple_extract<typename util::tuple_sort<std::tuple<ts...>, component_compare_less_than>::type, pipeline>::type;
+    
+    
 }

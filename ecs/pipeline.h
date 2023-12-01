@@ -6,34 +6,29 @@ namespace ecs {
     template<traits::component_class ... ts>
     class pipeline {
         template<typename u>
-        using pool_t = std::conditional_t<std::is_const_v<u>, const pool<u>, pool<u>>*;
-        template<typename u>
-        static constexpr bool is_accessible = (std::is_same_v<std::remove_const_t<u>, std::remove_const_t<ts>> || ...);
+        static constexpr bool is_accessible = (std::conditional_t<std::is_const_v<ts>, std::is_same<u, ts>, std::is_same<std::remove_const_t<u>, ts>>::value || ...);
     public:
         pipeline(registry* reg) { 
             std::lock_guard guard(*reg);
-            pools = std::tuple{ &reg->pool<ts>()... };
+            pools = std::tuple{ &reg->pool<std::remove_const_t<ts>>()... };
         }
 
         pipeline(const registry* reg) { 
             std::lock_guard guard(*reg);
-            pools = std::tuple{ &reg->pool<ts>() ... };
+            pools = std::tuple{ &reg->pool<std::remove_const_t<ts>>() ... };
         }
 
-        void lock() const {
-            (std::get<pool_t<ts>>(pools)->lock(), ...);
-        }
+        void lock() const { (pool<ts>().lock(), ...); }
         
-        void unlock() const {
-            (std::get<pool_t<ts>>(pools)->unlock(), ...);
-        }
+        void unlock() const { (pool<ts>().unlock(), ...); }
 
         template<traits::component_class u> requires (is_accessible<u>)
-        ecs::pool<u>& pool() const {
+        ecs::traits::pool_builder<u>& pool() const {
+            return *std::get<typename ecs::traits::pool_builder<std::remove_const_t<u>>*>(pools);
         }
 
     private:
-        std::tuple<pool_t<ts>...> pools;
+        std::tuple<typename ecs::traits::pool_builder<std::remove_const_t<ts>>*...> pools;
     };
 
 
