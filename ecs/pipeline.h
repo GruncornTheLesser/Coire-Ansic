@@ -23,12 +23,12 @@ namespace ecs {
         void unlock() const { (pool<ts>().unlock(), ...); }
 
         template<traits::component_class u> requires (is_accessible<u>)
-        ecs::traits::pool_builder<u>& pool() const {
-            return *std::get<typename ecs::traits::pool_builder<std::remove_const_t<u>>*>(pools);
+        traits::pool_builder<u>& pool() const {
+            return *std::get<typename traits::pool_builder<std::remove_const_t<u>>*>(pools);
         }
 
     private:
-        std::tuple<typename ecs::traits::pool_builder<std::remove_const_t<ts>>*...> pools;
+        std::tuple<typename traits::pool_builder<std::remove_const_t<ts>>*...> pools;
     };
 
 
