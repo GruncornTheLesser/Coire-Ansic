@@ -1,7 +1,7 @@
 #pragma once
 #include <tuple>
 
-namespace ecs::utility {
+namespace util {
     template<typename tup, template<typename> typename pred, typename o = std::tuple<>>
 	struct tuple_filter;
 	

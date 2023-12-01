@@ -143,5 +143,5 @@ namespace ecs::traits {
     template<typename t> struct component_id  { static constexpr int value = t::component_id; };
 
     template<typename t, typename u> struct component_sort { static constexpr bool value = component_id<t>::value < component_id<t>::value; };
-	template<typename ... ts> struct pipeline_builder : utility::tuple_extract<typename utility::tuple_sort<std::tuple<ts...>, component_sort>::type, pipeline> { };
+	template<typename ... ts> struct pipeline_builder : util::tuple_extract<typename util::tuple_sort<std::tuple<ts...>, component_sort>::type, pipeline> { };
 }
