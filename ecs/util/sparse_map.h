@@ -1,11 +1,11 @@
 #pragma once
 #include <memory>
 #include <exception>
-#include "fwd.h"
 
 namespace util {
 	constexpr size_t tombstone = -1;
 
+	template<typename key_t>
 	class sparse_map {
 	public:
 		
@@ -21,15 +21,15 @@ namespace util {
 			std::allocator<size_t*>().deallocate(pages, page_size);
 		}
 		
-		size_t& operator[](ecs::entity entity) {
-			size_t page_index = entity / page_size;			
-			size_t elem_index = entity % page_size; 
+		size_t& operator[](key_t key) {
+			size_t page_index = key / page_size;			
+			size_t elem_index = key % page_size; 
 			return assure_page(page_index)[elem_index];
 		}
 
-		const size_t& operator[](ecs::entity entity) const {
-			size_t page_index = entity / page_size;
-			size_t elem_index = entity % page_size;
+		const size_t& operator[](key_t key) const {
+			size_t page_index = key / page_size;
+			size_t elem_index = key % page_size;
 			
 			if (page_index > page_count || pages[page_index] == nullptr) 
 				throw std::out_of_range("");
@@ -37,33 +37,33 @@ namespace util {
 			return pages[page_index][elem_index];
 		} 
 		
-		size_t& at(ecs::entity entity) {
-			size_t page_index = entity / page_size;
-			size_t elem_index = entity % page_size;
+		size_t& at(key_t key) {
+			size_t page_index = key / page_size;
+			size_t elem_index = key % page_size;
 			if (page_index > page_count || pages[page_index] == nullptr) 
 				throw std::out_of_range("");
 			return pages[page_index][elem_index];
 		}
 
-		size_t at(ecs::entity entity) const {
-			size_t page_index = entity / page_size;
-			size_t elem_index = entity % page_size;
+		size_t at(key_t key) const {
+			size_t page_index = key / page_size;
+			size_t elem_index = key % page_size;
 			if (page_index > page_count || pages[page_index] == nullptr) 
 				tombstone;
 			return pages[page_index][elem_index];
 		}
 
-		void reserve(ecs::entity entity) {
-			assure_page(entity / page_size);
+		void reserve(key_t key) {
+			assure_page(key / page_size);
 		}
 
 		size_t size() const { 
 			return page_count * page_size;
 		}
 		
-		bool contains(ecs::entity entity) const {
-			size_t page_index = entity / page_size;
-			size_t elem_index = entity % page_size;
+		bool contains(key_t key) const {
+			size_t page_index = key / page_size;
+			size_t elem_index = key % page_size;
 			return page_index <= page_count && pages[page_index] != nullptr && pages[page_index][elem_index] != tombstone;
 		}
 		

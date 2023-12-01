@@ -1,6 +1,6 @@
 #pragma once
 #include <tuple>
-#include "tuple_util.h"
+#include "util/tuple_util.h"
 #include <type_traits>
 
 namespace ecs {

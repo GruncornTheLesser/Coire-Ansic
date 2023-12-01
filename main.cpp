@@ -24,6 +24,7 @@ int main() {
 		auto& pl3 = pip.pool<A>(); 			// no error
 		//pip.pool<B>(); 					// error
 		
+		
 	}
 }
 

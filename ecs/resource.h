@@ -1,8 +1,6 @@
 #pragma once
 #include <shared_mutex>
 namespace ecs {
-
-
     struct resource {
     public:
         void lock() { mtx.lock(); }
@@ -16,6 +14,4 @@ namespace ecs {
     private:
         mutable std::shared_mutex mtx; 
     };
-
-
 }

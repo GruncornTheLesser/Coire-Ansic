@@ -1,7 +1,7 @@
 #pragma once
 #include "fwd.h"
 #include "registry.h"
-#include "tuple_util.h"
+#include "util/tuple_util.h"
 namespace ecs {
     template<traits::component_class ... ts>
     class pipeline {

@@ -1,8 +1,8 @@
 #pragma once
 #include <algorithm>
 #include "fwd.h"
-#include "sparse_map.h"
-#include "next_pow2.h"
+#include "util/sparse_map.h"
+#include "util/next_pow2.h"
 #include "resource.h"
 
 namespace ecs {
@@ -12,7 +12,7 @@ namespace ecs {
         friend class pool_policy::immediate_inplace;
         friend class pool_policy::deferred_swap;
         friend class pool_policy::deferred_inplace;
-        using sparse_t = util::sparse_map;
+        using sparse_t = util::sparse_map<entity>;
         using return_t = std::conditional_t<std::is_empty_v<comp_t>, void, comp_t&>;
     public:
         pool(size_t cap = 8) : packed(std::allocator<entity>().allocate(cap)), capacity(cap), size(0) { 

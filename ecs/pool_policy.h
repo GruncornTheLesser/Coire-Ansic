@@ -1,6 +1,6 @@
 #pragma once
 #include "pool.h"
-#include "next_pow2.h"
+#include "util/next_pow2.h"
 namespace ecs::pool_policy {
     struct back {
     public:
