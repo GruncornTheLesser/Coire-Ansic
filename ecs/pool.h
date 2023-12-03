@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <functional>
 #include "fwd.h"
 #include "util/sparse_map.h"
 #include "util/next_pow2.h"
@@ -12,13 +13,16 @@ namespace ecs {
         friend class pool_policy::immediate_inplace;
         friend class pool_policy::deferred_swap;
         friend class pool_policy::deferred_inplace;
+        friend class pool_policy::back;
+
         using sparse_t = util::sparse_map<entity>;
-        using return_t = std::conditional_t<std::is_empty_v<comp_t>, void, comp_t&>;
+        using return_t = std::conditional_t<std::is_empty_v<comp_t>, void, comp_t&>;    
     public:
         pool(size_t cap = 8) : packed(std::allocator<entity>().allocate(cap)), capacity(cap), size(0) { 
             if constexpr (!std::is_empty_v<comp_t>)
                 buffer = std::allocator<comp_t>().allocate(cap);
         }
+
         ~pool() {
             if constexpr (!std::is_empty_v<comp_t>)
             {
@@ -29,19 +33,28 @@ namespace ecs {
             std::allocator<entity>().deallocate(packed, capacity);
         }
 
-        comp_t& operator[](entity e) requires (!std::is_empty_v<comp_t>) { return buffer[sparse[e]]; }
-        const comp_t& operator[](entity e) const requires (!std::is_empty_v<comp_t>) { return buffer[sparse[e]]; }
-        
-        entity at(size_t index) const { return packed[index]; }
-        
+        __attribute__ ((warning("copying constructing pool function called")))
+        pool(const pool<comp_t>&) = default;
+
+        __attribute__ ((warning("copying assigning pool function called")))
+        pool<comp_t>& operator=(const pool<comp_t>&) = default;
+
+        entity at(size_t i) const { return packed[i]; }
+
+        comp_t& get_component(entity e) { return buffer[sparse[e]]; }
+        const comp_t& get_component(entity e) const { return buffer[sparse[e]]; }
+
+        comp_t& get_component_at(size_t i) { return buffer[i]; }
+        const comp_t& get_component_at(size_t i) const { return buffer[i]; }
+
         size_t count() const { return size; }
 
-        comp_t* begin() { return buffer; }
-        comp_t* end() { return buffer + size; }
+        ecs::pool_iterator<comp_t> begin() { return ecs::pool_iterator<comp_t>{ this, 0 }; }
+        ecs::pool_iterator<const comp_t> begin() const { return ecs::pool_iterator<const comp_t>{ this, 0 }; }
 
-        const comp_t* begin() const { return buffer; }
-        const comp_t* end() const { return buffer + size; }
-        
+        ecs::pool_iterator<comp_t> end() { return ecs::pool_iterator<comp_t>{ this, size }; }
+        ecs::pool_iterator<const comp_t> end() const { return ecs::pool_iterator<const comp_t>{ this, size }; }
+
         void reserve(size_t cap) {
             size_t new_capacity = util::next_pow2(cap);
                 

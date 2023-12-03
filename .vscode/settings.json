@@ -62,6 +62,13 @@
         "format": "cpp",
         "span": "cpp",
         "cstdarg": "cpp",
-        "map": "cpp"
+        "map": "cpp",
+        "cassert": "cpp",
+        "cerrno": "cpp",
+        "climits": "cpp",
+        "execution": "cpp",
+        "ios": "cpp",
+        "locale": "cpp",
+        "queue": "cpp"
     }
 }

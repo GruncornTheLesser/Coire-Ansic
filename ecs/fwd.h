@@ -29,8 +29,8 @@ namespace ecs::traits {
 	template<typename t> concept pool_class = traits::is_pool<t>::value;
 	template<typename t> concept view_class = traits::is_view<t>::value;
 	template<typename t> concept group_class = traits::is_group<t>::value;
-	
-	template<typename t, typename comp> concept component_interface = is_component_interface<t, comp>::value;
+
+	//template<typename t, typename ... comp_ts> concept component_interface = (traits::is_component_interface<t, comp_ts>::value && ...);
 	template<typename t, typename comp> concept policy_class = is_pool_policy<t, comp>::value;
 
     template<typename t> struct component_id;
@@ -70,6 +70,11 @@ namespace ecs {
      * @tparam t the component stored in the pool 
      */
     template<traits::component_class t> class pool;
+    
+    /**
+     * @brief
+    */
+    template<traits::component_class t> class pool_iterator;
 
     /**
      * @brief a pipeline controls the pool access mutex locks to allow multithreading
@@ -95,6 +100,11 @@ namespace ecs {
     template<typename own, typename get> class group;
 
     /**
+     * @brief
+    */
+    template<traits::component_class t> class group_iterator;
+
+    /**
      * @brief a container for the view class. list of components that must be included
      * @tparam ...ts components included in this view
      */
@@ -110,6 +120,11 @@ namespace ecs {
      * @tparam exc components excluded in this view
      */
     template<typename inc, typename exc> class view;
+
+    /**
+     * @brief
+    */
+    template<traits::component_class t> class view_iterator;
 }
 
 namespace ecs::traits {
@@ -128,7 +143,7 @@ namespace ecs::traits {
             std::is_same_v<decltype(t::allocate_at(std::declval<ecs::pool<comp_t>&>(), 0, 0)), void> &&
             std::is_same_v<decltype(t::deallocate_at(std::declval<ecs::pool<comp_t>&>(), 0, 0)), void>;
     };
-
+    /*
     template<typename t, typename comp_t> struct is_component_interface : std::false_type { };    
     template<typename t, typename comp_t> struct is_component_interface<t&, comp_t> : is_component_interface<t, comp_t> { };
 
@@ -138,13 +153,14 @@ namespace ecs::traits {
     
     template<typename ... ts, typename comp_t> struct is_component_interface<pool<ts...>,     comp_t> : std::bool_constant<(is_component_interface<ts, comp_t>::value || ...)> { };
     template<typename ... ts, typename comp_t> struct is_component_interface<pipeline<ts...>, comp_t> : std::bool_constant<(is_component_interface<ts, comp_t>::value || ...)> { };
-
+    */
+    
     template<typename t> struct component_id  { static constexpr int value = t::component_id; };
 
     template<typename t, typename u> struct component_compare_less_than : std::bool_constant<(component_id<t>::value < component_id<u>::value)> { };
     template<typename t, typename u> struct component_compare_equal : std::bool_constant<(component_id<t>::value == component_id<u>::value)> { };
 
-    template<typename t> using pool_builder = std::conditional_t<std::is_const_v<t>, const pool<std::remove_const_t<t>>, pool<t>>;
+    template<typename t>      using pool_builder = std::conditional_t<std::is_const_v<t>, const pool<std::remove_const_t<t>>, pool<t>>;
     template<typename ... ts> using pipeline_builder = util::tuple_extract<typename util::tuple_sort<std::tuple<ts...>, component_compare_less_than>::type, pipeline>::type;
     
     

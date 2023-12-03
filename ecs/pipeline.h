@@ -28,7 +28,7 @@ namespace ecs {
         }
 
     private:
-        std::tuple<typename traits::pool_builder<std::remove_const_t<ts>>*...> pools;
+        std::tuple<traits::pool_builder<std::remove_const_t<ts>>*...> pools;
     };
 
 
