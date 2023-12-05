@@ -39,6 +39,8 @@ namespace ecs {
         __attribute__ ((warning("copying assigning pool function called")))
         pool<comp_t>& operator=(const pool<comp_t>&) = default;
 
+        bool contains(entity e) const { return sparse.contains(e); }
+
         entity at(size_t i) const { return packed[i]; }
 
         comp_t& get_component(entity e) { return buffer[sparse[e]]; }
@@ -49,11 +51,11 @@ namespace ecs {
 
         size_t count() const { return size; }
 
-        ecs::pool_iterator<comp_t> begin() { return ecs::pool_iterator<comp_t>{ this, 0 }; }
-        ecs::pool_iterator<const comp_t> begin() const { return ecs::pool_iterator<const comp_t>{ this, 0 }; }
+        ecs::iterator<pool<comp_t>> begin() { return ecs::iterator<pool<comp_t>>{ this, 0 }; }
+        ecs::iterator<pool<const comp_t>> begin() const { return ecs::iterator<pool<const comp_t>>{ this, 0 }; }
 
-        ecs::pool_iterator<comp_t> end() { return ecs::pool_iterator<comp_t>{ this, size }; }
-        ecs::pool_iterator<const comp_t> end() const { return ecs::pool_iterator<const comp_t>{ this, size }; }
+        ecs::iterator<pool<comp_t>> end() { return ecs::iterator<pool<comp_t>>{ this, size }; }
+        ecs::iterator<pool<const comp_t>> end() const { return ecs::iterator<pool<const comp_t>>{ this, size }; }
 
         void reserve(size_t cap) {
             size_t new_capacity = util::next_pow2(cap);
@@ -179,5 +181,35 @@ namespace ecs {
 
         size_t   capacity;
         size_t   size;
+    };
+
+    template<traits::component_class t>
+    class iterator<pool<t>> {
+        using base_t = traits::pool_builder<t>;
+    public:
+        iterator(base_t* b, size_t i) : base(b), index(i) { }
+
+        auto operator*() const { 
+            if constexpr (std::is_empty_v<t>) return base->at(index); 
+            else return std::tuple<entity, t&> { base->at(index), base->get_component_at(index) }; 
+        }
+        
+        iterator<pool<t>>& operator++() { ++index; return *this; }
+        iterator<pool<t>>& operator--() { --index; return *this; }
+        template<std::integral int_t> iterator<pool<t>>& operator+=(int_t i) { index += i; return *this; }
+        template<std::integral int_t> iterator<pool<t>>& operator-=(int_t i) { index -= i; return *this; }
+        template<std::integral int_t> iterator<pool<t>> operator+(int_t i) { return iterator<pool<t>> { base, index + i }; }
+        template<std::integral int_t> iterator<pool<t>> operator-(int_t i) { return iterator<pool<t>> { base, index - i }; }
+        ptrdiff_t operator-(const iterator<pool<t>>& other) { return index - other.index; }
+        bool operator==(const iterator<pool<t>>& other) { return index == other.index; }
+        bool operator!=(const iterator<pool<t>>& other) { return index != other.index; }
+        bool operator<(const iterator<pool<t>>& other) { return index < other.index; }
+        bool operator>(const iterator<pool<t>>& other) { return index > other.index; }
+        bool operator<=(const iterator<pool<t>>& other) { return index <= other.index; }
+        bool operator>=(const iterator<pool<t>>& other) { return index >= other.index; }
+
+    private:
+        base_t* base;
+        size_t index;
     };
 }

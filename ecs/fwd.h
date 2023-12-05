@@ -2,6 +2,7 @@
 #include <tuple>
 #include "util/tuple_util.h"
 #include <type_traits>
+#include <concepts>
 
 namespace ecs {
     using entity = unsigned long int;
@@ -70,11 +71,6 @@ namespace ecs {
      * @tparam t the component stored in the pool 
      */
     template<traits::component_class t> class pool;
-    
-    /**
-     * @brief
-    */
-    template<traits::component_class t> class pool_iterator;
 
     /**
      * @brief a pipeline controls the pool access mutex locks to allow multithreading
@@ -83,48 +79,26 @@ namespace ecs {
     template<traits::component_class ... ts> class pipeline;
 
     /**
-     * @brief a container for the group class. list of components to be retrieved but not reordered by this group
-     * @tparam ...ts components retrieved but not owned by a group 
-     */
-    template<traits::component_class ... ts> using get = std::tuple<ts...>;
-    /**
-     * @brief a container for the group class. list of components to be reordered for faster access by this group
-     * @tparam ...ts components owned by a group
-     */
-    template<traits::component_class ... ts> using own = std::tuple<ts...>;
-    /**
-     * @brief a group stores an entity index mapping, and allows for faster iteration of a set of components
-     * @tparam own components owned by this group
-     * @tparam get components retrieved by this group
-     */
-    template<typename own, typename get> class group;
-
-    /**
-     * @brief
-    */
-    template<traits::component_class t> class group_iterator;
-
-    /**
      * @brief a container for the view class. list of components that must be included
      * @tparam ...ts components included in this view
      */
-    template<traits::component_class ... ts> using inc = std::tuple<ts...>;
+    template<traits::component_class ... ts> struct inc { };
     /**
      * @brief a container for the view class. list of components that must be excluded
      * @tparam ...ts components excluded in this view 
      */
-    template<traits::component_class ... ts> using exc = std::tuple<ts...>;
+    template<traits::component_class ... ts> struct exc { };
     /**
      * @brief a view allows for iteration of a set of components. 
      * @tparam inc components included in this view
      * @tparam exc components excluded in this view
      */
-    template<typename inc, typename exc> class view;
+    template<traits::pipeline_class pip, typename inc_t, typename exc_t> class view;
 
     /**
      * @brief
     */
-    template<traits::component_class t> class view_iterator;
+    template<typename base> class iterator;
 }
 
 namespace ecs::traits {
@@ -135,8 +109,8 @@ namespace ecs::traits {
     template<typename t> struct is_pool : std::false_type { };
     template<typename t> struct is_pool<pool<t>> : std::true_type { };
 
-    template<typename t>             struct is_pipeline : std::false_type { };
-    template<pool_class ... pool_ts> struct is_pipeline<pipeline<pool_ts...>> : std::true_type { };
+    template<typename t>      struct is_pipeline : std::false_type { };
+    template<typename ... ts> struct is_pipeline<pipeline<ts...>> : std::true_type { };
 
     template<typename t, typename comp_t> struct is_pool_policy {
         static constexpr bool value = 
@@ -162,6 +136,4 @@ namespace ecs::traits {
 
     template<typename t>      using pool_builder = std::conditional_t<std::is_const_v<t>, const pool<std::remove_const_t<t>>, pool<t>>;
     template<typename ... ts> using pipeline_builder = util::tuple_extract<typename util::tuple_sort<std::tuple<ts...>, component_compare_less_than>::type, pipeline>::type;
-    
-    
 }

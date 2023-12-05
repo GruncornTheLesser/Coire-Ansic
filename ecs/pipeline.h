@@ -18,15 +18,19 @@ namespace ecs {
             pools = std::tuple{ &reg->pool<std::remove_const_t<ts>>() ... };
         }
 
-        void lock() const { (pool<ts>().lock(), ...); }
+        void lock() { (pool<ts>().lock(), ...); }
         
-        void unlock() const { (pool<ts>().unlock(), ...); }
+        void unlock() { (pool<ts>().unlock(), ...); }
 
         template<traits::component_class u> requires (is_accessible<u>)
         traits::pool_builder<u>& pool() const {
             return *std::get<typename traits::pool_builder<std::remove_const_t<u>>*>(pools);
         }
 
+        template<traits::component_class ... inc_us, traits::component_class ... exc_us>
+        auto view(exc<exc_us...> = exc<>{}) {
+            return ecs::view<ecs::pipeline<ts...>, ecs::inc<inc_us...>, ecs::exc<exc_us...>>(this);
+        }
     private:
         std::tuple<traits::pool_builder<std::remove_const_t<ts>>*...> pools;
     };

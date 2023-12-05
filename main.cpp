@@ -1,9 +1,9 @@
-#include "ecs/fwd.h"
 #include "ecs/registry.h"
-#include "ecs/pool.h"
 #include "ecs/pipeline.h"
+#include "ecs/pool.h"
+#include "ecs/view.h"
 #include "ecs/pool_policy.h"
-#include "ecs/iterator.h"
+
 #include <iostream>
 
 #define SET_COMPONENT_ID public: static constexpr int component_id = __COUNTER__; 
@@ -16,23 +16,30 @@ struct D { SET_COMPONENT_ID };
 int main() {
 	using namespace ecs;
 
-	ecs::registry reg;
+	registry reg;
+
+	pipeline<A, const B> pip { &reg };
 	
-	auto pip = reg.pipeline<const B, A>();
+	reg.pool<B>().emplace_back(0);
 	
+
 	{
 		std::lock_guard guard(pip);
-		auto& const_pl = pip.pool<const A>(); 	// no error
-		//auto& pl2 = pip.pool<const B>(); 		// no error
-		auto& pl = pip.pool<A>(); 				// no error
-		//pip.pool<B>(); 						// error
 
-		pl.emplace_back(0);
-		pl.emplace_back(1);
+		const pool<A>& const_pl = pip.pool<const A>();
+		pool<A>&             pl = pip.pool<A>();
 
-		for (auto [e, a] : const_pl) { std::cout << e << "\n"; }
-		for (auto [e, a] : pl)       { std::cout << e << "\n"; }
+		pip.pool<A>().emplace_back(0);
+		pip.pool<A>().emplace_back(1);
+
+		for (auto [e, a] : pip.pool<const A>()) { std::cout << e << "\n"; }
+		for (auto [e, a] : pip.pool<A>())       { std::cout << e << "\n"; }
 		
+		for (auto [e, b] : pip.view<const B>()) { std::cout << e << "\n"; }
+		for (auto [e, a] : pip.view<A>(exc<B>{})) { std::cout << e << "\n"; }
+
 	}
+
+	std::cout << "end...\n";
 }
 
