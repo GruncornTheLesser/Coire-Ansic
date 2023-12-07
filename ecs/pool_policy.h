@@ -2,10 +2,17 @@
 #include "pool.h"
 #include "util/next_pow2.h"
 namespace ecs::pool_policy {
-    struct back {
-    public:
+    struct where {
+        template<typename comp_t> static size_t get_index(pool<comp_t>& pl, ecs::back where) { return pl.count(); }
+        template<typename comp_t> static size_t get_index(pool<comp_t>& pl, ecs::front where) { return 0; }
+        template<typename comp_t> static size_t get_index(pool<comp_t>& pl, ecs::at where) { return where.value; }
+        template<typename comp_t> static size_t get_index(pool<comp_t>& pl, ecs::elem where) { return pl.sparse[where.value]; }
+        
+    };
+
+    struct back_policy {
         template<typename comp_t>
-        static inline void allocate(pool<comp_t>& pl, size_t count) {
+        static inline void allocate_for(pool<comp_t>& pl, ecs::back, size_t count) {
             size_t new_size = pl.size + count;
             if (new_size >= pl.capacity)
             {
@@ -28,23 +35,64 @@ namespace ecs::pool_policy {
             }
             pl.size = new_size;
         }
-
+    
         template<typename comp_t>
-        static inline void deallocate(pool<comp_t>& pl, size_t count) {
+        static inline void deallocate_for(pool<comp_t>& pl, ecs::back, size_t count) {
             size_t new_size = pl.size - count;
             pl.size = new_size;
         }
     };
 
-    struct immediate_swap {
-    public:
+    struct front_policy {
         template<typename comp_t>
-        static inline void allocate_at(pool<comp_t>& pl, size_t index, size_t count) {
+        static inline void allocate_for(pool<comp_t>& pl, ecs::front, size_t count) {
+            size_t new_size = pl.size + count;
+            if (new_size >= pl.capacity)
+            {
+                size_t new_capacity = util::next_pow2(new_size);
+                
+                if constexpr (!std::is_empty_v<comp_t>)
+                {
+                    comp_t* new_buffer = std::allocator<comp_t>().allocate(new_capacity);
+                    std::move(pl.buffer, pl.buffer + pl.size, new_buffer + count);
+                    std::allocator<comp_t>().deallocate(pl.buffer, pl.capacity);
+                    pl.buffer = new_buffer;
+                }
+
+                entity* new_packed = std::allocator<entity>().allocate(new_capacity);
+                std::move(pl.packed, pl.packed + pl.size, new_packed + count);
+                std::allocator<entity>().deallocate(pl.packed, pl.capacity);
+                pl.packed = new_packed;
+
+                pl.capacity = new_capacity;
+            }
+            pl.size = new_size;
+        }
+    
+        template<typename comp_t>
+        static inline void deallocate_for(pool<comp_t>& pl, ecs::front, size_t count) {
+            std::move(pl.packed + count, pl.packed + pl.size, pl.packed);
+            
+            if constexpr (!std::is_empty_v<comp_t>)
+                std::move(pl.buffer + count, pl.buffer + pl.size, pl.buffer);
+
+            for (size_t i = 0; i < count; ++i) pl.sparse[pl.packed[i]] = i;
+
+            pl.size = pl.size - count;
+        }
+    
+    };
+
+    struct swap_policy : back_policy, front_policy, where {
+    public:
+        template<typename comp_t, typename where_t>
+        static inline void allocate_for(pool<comp_t>& pl, where_t where, size_t count) {
+            size_t index = get_index(pl, where);
             size_t new_size = pl.size + count;
             
             size_t last = std::min(index + count, pl.size); // end of range that needs moving
             size_t back = std::max(index + count, pl.size); // new_size - number of moved elements
-                
+            
             if (pl.capacity <= new_size) 
             {
                 size_t new_capacity = util::next_pow2(new_size);
@@ -83,11 +131,11 @@ namespace ecs::pool_policy {
                 pl.sparse[pl.packed[i]] = i;
         }
 
-        template<typename comp_t>
-        static inline void deallocate_at(pool<comp_t>& pl, size_t index, size_t count) {
+        template<typename comp_t, typename where_t>
+        static inline void deallocate_at(pool<comp_t>& pl, where_t where, size_t count) {
             // if deallocate range overlaps with back replacing range:
             // 
-
+            size_t index = get_index(pl, where);
             size_t new_size = pl.size - count;
             size_t back = index + count;
             size_t src =      std::max(back, new_size);
@@ -108,10 +156,11 @@ namespace ecs::pool_policy {
         }
     };
     
-    struct immediate_inplace {
+    struct inplace_policy : back_policy, front_policy, where {
     public:
-        template<typename comp_t>
-        static void allocate_at(pool<comp_t>& pl, size_t index, size_t count) {
+        template<typename comp_t, typename where_t>
+        static void allocate_for(pool<comp_t>& pl, where_t where, size_t count) {
+            size_t index = get_index(where);
             size_t new_size = pl.size + count;
             size_t last = index + count;
             
@@ -154,8 +203,9 @@ namespace ecs::pool_policy {
                 pl.sparse[pl.packed[i]] = i;
         }
     
-        template<typename comp_t>
-        static void deallocate_at(pool<comp_t>& pl, size_t index, size_t count) {
+        template<typename comp_t, typename where_t>
+        static void deallocate_at(pool<comp_t>& pl, where_t where, size_t count) {
+            size_t index = get_index(where);
             size_t last = index + count;
     
             if constexpr (!std::is_empty_v<comp_t>)
@@ -169,8 +219,5 @@ namespace ecs::pool_policy {
                 pl.sparse[pl.packed[i]] = i;
         }
     };
-
-    struct deferred_swap;
-    struct deferred_inplace;
 }
 

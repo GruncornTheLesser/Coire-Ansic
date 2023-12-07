@@ -2,7 +2,7 @@
 #include "fwd.h"
 
 namespace ecs {
-    template<traits::pipeline_class pip_t, traits::component_class ... inc_ts, traits::component_class ... exc_ts>
+    template<traits::pipeline_class pip_t, traits::comp_class ... inc_ts, traits::comp_class ... exc_ts>
     class view<pip_t, inc<inc_ts...>, exc<exc_ts...>> {
     public:
         using view_iterator = ecs::iterator<view<pip_t, inc<inc_ts...>, exc<exc_ts...>>>;
@@ -18,7 +18,7 @@ namespace ecs {
         pip_t* base;
     };
 
-    template<typename ... pip_ts, traits::component_class inc_t, traits::component_class ... inc_ts, traits::component_class ... exc_ts>
+    template<typename ... pip_ts, traits::comp_class inc_t, traits::comp_class ... inc_ts, traits::comp_class ... exc_ts>
     class iterator<view<pipeline<pip_ts...>, inc<inc_t, inc_ts...>, exc<exc_ts...>>> {
     using pip_t = pipeline<pip_ts...>;
     public:
@@ -26,7 +26,7 @@ namespace ecs {
 
         auto operator*() const { 
             entity e = base->template pool<inc_t>().at(index);
-            return std::tuple_cat(std::tuple<entity, inc_t&>(e, base->template pool<inc_t>().get_component_at(index)), get_or_empty<inc_ts>()...);
+            return std::tuple_cat(std::tuple<entity, inc_t&>(e, base->template pool<inc_t>().get_comp_at(index)), get_or_empty<inc_ts>()...);
         }
         iterator<view<pip_t, inc<inc_t, inc_ts...>, exc<exc_ts...>>>& operator++() { 
             entity e;
@@ -48,7 +48,7 @@ namespace ecs {
         template<typename u>
         auto get_or_empty(entity e) {
             if constexpr(std::is_empty_v<u>) return std::tuple<>{};
-            else return std::tuple<u&>(base->template pool<u>().get_component(e));
+            else return std::tuple<u&>(base->template pool<u>().get_comp(e));
         }
         pip_t* base;
         size_t index;
