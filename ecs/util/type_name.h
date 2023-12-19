@@ -17,7 +17,7 @@
     #error "No support for this compiler."
 #endif
 
-namespace ecs {
+namespace util {
     template<typename t> constexpr std::basic_string_view<char> type_name() {
         return { COMPILER_PRETTY_FUNCTION + sizeof(PRETTY_FUNCTION_PREFIX) - 1, sizeof(COMPILER_PRETTY_FUNCTION) + 1 - sizeof(PRETTY_FUNCTION_PREFIX) - sizeof(PRETTY_FUNCTION_SUFFIX) };
     }
