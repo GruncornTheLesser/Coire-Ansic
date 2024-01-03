@@ -1,6 +1,12 @@
 {
     "C_Cpp.default.cppStandard": "c++23",
     "C_Cpp.default.cStandard": "c23",
+    
+    "workbench.colorCustomizations" : { 
+        "editorError.border": "#ffffff00",
+        "editorError.foreground": "#ffffff",
+        "editorError.background": "#ff000020",
+    },
     "files.associations": {
         "type_traits": "cpp",
         "array": "cpp",
@@ -69,6 +75,12 @@
         "execution": "cpp",
         "ios": "cpp",
         "locale": "cpp",
-        "queue": "cpp"
-    }
+        "queue": "cpp",
+        "ranges": "cpp",
+        "cstring": "cpp",
+        "forward_list": "cpp",
+        "iomanip": "cpp",
+        "sstream": "cpp",
+        "valarray": "cpp"
+    },
 }

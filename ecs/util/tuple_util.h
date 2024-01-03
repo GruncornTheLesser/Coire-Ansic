@@ -1,5 +1,6 @@
 #pragma once
 #include <tuple>
+#include "type_name.h"
 
 namespace util {
     template<typename tup, template<typename> typename pred, typename o = std::tuple<>>
@@ -18,7 +19,10 @@ namespace util {
 		using type = o;
 	};
 
-	template<typename tup, template<typename, typename> typename cmp>
+	template<typename lhs, typename rhs> 
+	struct alphabetical_cmp : std::bool_constant<(util::type_name<lhs>() < util::type_name<rhs>())> { };
+
+	template<typename tup, template<typename, typename> typename cmp = alphabetical_cmp>
 	struct tuple_sort;
 
 	template<typename t, typename ... ts, template<typename, typename> typename cmp>
@@ -37,24 +41,28 @@ namespace util {
 		using type = std::tuple<>;
 	};
 
+	template<typename tup, template<typename, typename> typename cmp = std::is_same>
+	struct tuple_unique;
+
+	template<typename t, typename ... ts, template<typename, typename> typename cmp>
+	struct tuple_unique<std::tuple<t, ts...>, cmp> {
+		template<typename u> using pred = std::negation<std::is_same<u, t>>;
+		using type = decltype(std::tuple_cat(std::declval<std::tuple<t>>(), std::declval<typename tuple_unique<typename tuple_filter<std::tuple<ts...>, pred>::type, cmp>::type>()));
+	};
+
+	template<typename t>
+	struct not_empty : std::negation<std::is_empty<t>> { };
+
+	template<template<typename, typename> typename cmp>
+	struct tuple_unique<std::tuple<>, cmp> {
+		using type = std::tuple<>;
+	};
+
     template<typename tup, template<typename ...> typename t>
     struct tuple_extract;
 
     template<typename ... ts, template<typename...> typename t>
     struct tuple_extract<std::tuple<ts...>, t> { 
         using type = t<ts...>;
-	};
-	
-	template<typename tup, template<typename...> typename pred, typename ... args>
-	struct tuple_find;
-
-	template<typename t, typename ... ts, template<typename...> typename pred, typename ... args>
-	struct tuple_find<std::tuple<t, ts...>, pred, args...> {
-		using type = std::conditional_t<pred<t, args...>::value, t, typename tuple_find<std::tuple<ts...>, pred, args...>::type>;
-	};
-
-	template<template<typename...> typename pred, typename ... args>
-	struct tuple_find<std::tuple<>, pred, args...> {
-		using type = std::exception;
 	};
 }

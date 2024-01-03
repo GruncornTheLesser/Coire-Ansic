@@ -1,5 +1,17 @@
-#include "ecs.h"
 #include <iostream>
+#include <span>
+#include <tuple>
+#include <type_traits>
+
+#include "ecs/fwd.h"
+
+#include "ecs/registry.h"
+#include "ecs/pipeline.h"
+#include "ecs/pool.h"
+#include "ecs/view.h"
+#include "ecs/element.h"
+
+//#include "ecs/registry.h"
 //TODO:
 //	HANDLE MANAGER!!!
 //  add some asserts/error checking
@@ -9,51 +21,54 @@
 //	expand view condition to allow "any_of" -> maybe update language
 //		DO NOT FALL DOWN RABBIT HOLE OF CONDITION EVALUALTION OPTIMISATION
 //		limit the scope to something more achievable 
-//  better comp pool collection type control
-//	 	either dont sort ts in pipeline or double down and expand it...
-//		expand pool collection types such as 
-//			archetype, -> pool<std::tuple<ts...>>
-//			uniontype, -> pool<std::variant<ts...>>
-//			basictype  -> pool<t>
-//  
-// NOTE:
-// maybe I could better increase parallel control by introducing a new constantness parameter
-// eg 
-//		const pool<const comp>		// comp position wont change and comp value wont change
-// 		const pool<comp> 			// comp position can change but comp value wont change
-//		pool<comp>					// comp position can change and comp value can change
-// 		pool<const comp>			// comp position can change but comp value wont change -> not useful
 
-// 		a system could iterate through the values but not change their position???
-// 		there is no nice way to give syntax to that...
-// 			could wrap comp for pipeline eg const, modify, write pipeline<read<comp>, modify<comp>>
+struct A { char a; };
+struct B { };
 
+struct C;
+struct D;
 
-#define SET_comp_ID public: static constexpr int comp_id = __COUNTER__; 
+struct C { char c[32]; using container = ecs::container::uniontype<C, D>; };
+struct D { char d[32]; using container = ecs::container::uniontype<C, D>; };
 
-struct A { SET_comp_ID size_t a; A() {} A(A& other) { std::cout << "I've been copied!!!\n"; } A& operator=(const A& other) { std::cout << "I've been copied!!!\n"; return *this; }};
-struct B { SET_comp_ID size_t b; };
-struct C { SET_comp_ID };
-struct D { SET_comp_ID };
+struct F;
+struct G;
+
+struct F { char c[32]; using container = ecs::container::archetype<F, G>; };
+struct G { char c[32]; using container = ecs::container::archetype<F, G>; };
 
 int main() {
-	using namespace ecs;
-	auto x = std::is_same_v<unsigned long int, entity>;
-	registry reg;
-	pipeline<A, B> pip { &reg };
-	reg.pool<B>().emplace(back{}, 0);
-	reg.pool<A>().emplace(at{0}, 0);
-	reg.pool<A>().emplace(front{}, 1);
+    ecs::registry reg;
 
-	{
-		std::lock_guard guard(pip);
+    auto  pip = reg.pipeline<A, B, C, F, G>();
+    {
+        { auto& [e, a] = *pip.pool<const A>().begin(); }
+        { auto& [e, cd] = *pip.pool<const C>().begin(); }
+        { auto& [e, f, g] = *pip.pool<const F>().begin(); }
 
-		for (auto [e, a] : pip.pool<const A>())   { std::cout << e << "\n"; }
-		for (auto [e, a] : pip.pool<A>())         { std::cout << e << "\n"; }
-		for (auto [e, b] : pip.view<const B>())   { std::cout << e << "\n"; }
-		for (auto [e, a] : pip.view<A>(exc<B>{})) { std::cout << e << "\n"; }
-	}
+        { auto& [e, a] = *pip.pool<A>().begin(); }
+        { auto& [e, cd] = *pip.pool<C>().begin(); }
+        { auto& [e, f, g] = *pip.pool<F>().begin(); }
 
-	std::cout << "end...\n";
+        { auto [e, f, c] = *pip.view<F, C>().begin(); }
+
+        { ecs::entity e7 = *pip.pool<A>().begin(); }
+        { ecs::entity e8 = *pip.pool<C>().begin(); }
+        { ecs::entity e9 = *pip.pool<F>().begin(); }
+        { ecs::entity e7 = *pip.pool<const A>().begin(); }
+        { ecs::entity e8 = *pip.pool<const C>().begin(); }
+        { ecs::entity e9 = *pip.pool<const F>().begin(); }
+        
+        { A& e7 = *pip.pool<A>().begin(); }
+        { C& e8 = *pip.pool<C>().begin(); }
+        { F& e9 = *pip.pool<F>().begin(); }
+        { const A& e7 = *pip.pool<const A>().begin(); }
+        { const C& e8 = *pip.pool<const C>().begin(); }
+        { const F& e9 = *pip.pool<const F>().begin(); }
+
+
+
+        
+    }
 }
 

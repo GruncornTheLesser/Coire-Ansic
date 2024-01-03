@@ -3,31 +3,28 @@
 #include <exception>
 
 namespace util {
-	constexpr size_t tombstone = -1;
-
-	template<typename key_t>
+	template<typename val_t, val_t tombstone = static_cast<val_t>(-1)>
 	class sparse_map {
 	public:
-		
-        sparse_map(size_t new_page_count = 8) : page_count(new_page_count) {
+		sparse_map(size_t new_page_count = 8) : page_count(new_page_count) {
 			pages = std::allocator<size_t*>().allocate(page_count);
 			std::fill(pages, pages + page_count, nullptr);
 		}
 
 		~sparse_map() {
-            for (size_t **cur = pages, **end = pages + page_count; cur != end; ++cur) {
-                if (*cur != nullptr) std::allocator<size_t>().deallocate(*cur, page_size);
-            }
+			for (size_t **cur = pages, **end = pages + page_count; cur != end; ++cur) {
+				if (*cur != nullptr) std::allocator<size_t>().deallocate(*cur, page_size);
+			}
 			std::allocator<size_t*>().deallocate(pages, page_size);
 		}
 		
-		size_t& operator[](key_t key) {
+		size_t& operator[](int key) {
 			size_t page_index = key / page_size;			
 			size_t elem_index = key % page_size; 
 			return assure_page(page_index)[elem_index];
 		}
 
-		const size_t& operator[](key_t key) const {
+		const size_t& operator[](int key) const {
 			size_t page_index = key / page_size;
 			size_t elem_index = key % page_size;
 			
@@ -37,7 +34,7 @@ namespace util {
 			return pages[page_index][elem_index];
 		} 
 		
-		size_t& at(key_t key) {
+		size_t& at(int key) {
 			size_t page_index = key / page_size;
 			size_t elem_index = key % page_size;
 			if (page_index > page_count || pages[page_index] == nullptr) 
@@ -45,7 +42,7 @@ namespace util {
 			return pages[page_index][elem_index];
 		}
 
-		size_t at(key_t key) const {
+		size_t at(int key) const {
 			size_t page_index = key / page_size;
 			size_t elem_index = key % page_size;
 			if (page_index > page_count || pages[page_index] == nullptr) 
@@ -53,7 +50,7 @@ namespace util {
 			return pages[page_index][elem_index];
 		}
 
-		void reserve(key_t key) {
+		void reserve(int key) {
 			assure_page(key / page_size);
 		}
 
@@ -61,7 +58,7 @@ namespace util {
 			return page_count * page_size;
 		}
 		
-		bool contains(key_t key) const {
+		bool contains(int key) const {
 			size_t page_index = key / page_size;
 			size_t elem_index = key % page_size;
 			return page_index <= page_count && pages[page_index] != nullptr && pages[page_index][elem_index] != tombstone;
@@ -96,7 +93,7 @@ namespace util {
 	
 		static constexpr size_t page_size = 4096;
 	
-		size_t** 	pages;
-		size_t  	page_count;
+		size_t** pages;
+		size_t   page_count;
 	};
 }
