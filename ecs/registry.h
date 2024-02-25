@@ -1,27 +1,48 @@
 #pragma once
-#include "fwd.h"
-#include "util/any_set.h"
 #include <shared_mutex>
+#include <functional>
+#include <typeindex>
+#include <memory>
+#include "traits.h"
+#include "pipeline.h"
 namespace ecs {
-    class registry {
-        template<type_traits::pool_class ... ts> friend class pipeline_t;
-    public:        
-        template<type_traits::comp_class ... us>
-        ecs::pipeline<us...> pipeline() {
-            return ecs::pipeline<us...>{ *this };
-        }
-        template<type_traits::comp_class ... us>
-        ecs::pipeline<us...> pipeline() const {
-            return ecs::pipeline<us...>{ *this };
-        }
-        void lock() { mtx.lock(); }
-        void lock() const { mtx.lock_shared(); }
-        
-        void unlock() { mtx.unlock(); }
-        void unlock() const { mtx.unlock_shared(); }
+	class registry {
+		class erased_ptr {
+		public:
+			template<typename T>
+			erased_ptr(T* ptr);
 
-    private:
-        mutable std::shared_mutex mtx;
-        ::util::any_set poolset;
-    };
+			template<typename T>
+			T& get();
+
+		private:
+			std::unique_ptr<void, std::function<void(void*)>> ptr;
+		};
+
+		using data_t = std::unordered_map<std::type_index, erased_ptr>;
+
+	public:
+		template<traits::acquireable u, typename ... arg_us>
+		u& try_emplace(arg_us ... args);
+
+		template<traits::acquireable u>
+		u& get() const;
+
+		template<traits::acquireable u>
+		void erase();
+
+		template<traits::acquireable u>
+		void try_erase();
+
+		template<traits::acquireable u>
+		bool contains() const;
+
+		template<traits::acquireable ... us>
+		pipeline<us...> pipeline();
+
+	private:
+		data_t data;
+	};
 }
+
+#include "registry.tpp"

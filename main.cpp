@@ -1,74 +1,83 @@
-#include <iostream>
-#include <span>
-#include <tuple>
-#include <type_traits>
-
-#include "ecs/fwd.h"
-
 #include "ecs/registry.h"
-#include "ecs/pipeline.h"
 #include "ecs/pool.h"
-#include "ecs/view.h"
-#include "ecs/element.h"
+#include <iostream>
 
-//#include "ecs/registry.h"
-//TODO:
-//	HANDLE MANAGER!!!
-//  add some asserts/error checking
-//		adding an entity that pool already contains
-//		removing an entity that pool doesnt contain
-// 		static validation on view condition erase contradictory statements
-//	expand view condition to allow "any_of" -> maybe update language
-//		DO NOT FALL DOWN RABBIT HOLE OF CONDITION EVALUALTION OPTIMISATION
-//		limit the scope to something more achievable 
-
-struct A { char a; };
-struct B { };
-
+struct A;
+struct B;
 struct C;
-struct D;
 
-struct C { char c[32]; using container = ecs::container::uniontype<C, D>; };
-struct D { char d[32]; using container = ecs::container::uniontype<C, D>; };
-
-struct F;
-struct G;
-
-struct F { char c[32]; using container = ecs::container::archetype<F, G>; };
-struct G { char c[32]; using container = ecs::container::archetype<F, G>; };
+struct A { 
+	using pool_tag = ecs::archetype<A, B>;
+	char a; 
+};
+struct B { 
+	using pool_tag = ecs::archetype<A, B>;
+	char b; 
+};
+struct C { 
+	char c; 
+};
 
 int main() {
-    ecs::registry reg;
+	using namespace ecs;
 
-    auto  pip = reg.pipeline<A, B, C, F, G>();
-    {
-        { auto& [e, a] = *pip.pool<const A>().begin(); }
-        { auto& [e, cd] = *pip.pool<const C>().begin(); }
-        { auto& [e, f, g] = *pip.pool<const F>().begin(); }
+	registry reg;
+	
+	using pip_t = pipeline<pool<A>>;
+	auto pip = reg.pipeline<pool<A>>();
+	{
+		pip.lock();
+		pool<A>::index& pl_i = pip.get_resource<pool<A>::index>();
+		
+		// synchronization???
+		//		index always matches component, array
+		// 		const
+		//		entity does not always match index
+		//			loop through entity by index, get prev index of entity, swap components, update index
 
-        { auto& [e, a] = *pip.pool<A>().begin(); }
-        { auto& [e, cd] = *pip.pool<C>().begin(); }
-        { auto& [e, f, g] = *pip.pool<F>().begin(); }
-
-        { auto [e, f, c] = *pip.view<F, C>().begin(); }
-
-        { ecs::entity e7 = *pip.pool<A>().begin(); }
-        { ecs::entity e8 = *pip.pool<C>().begin(); }
-        { ecs::entity e9 = *pip.pool<F>().begin(); }
-        { ecs::entity e7 = *pip.pool<const A>().begin(); }
-        { ecs::entity e8 = *pip.pool<const C>().begin(); }
-        { ecs::entity e9 = *pip.pool<const F>().begin(); }
-        
-        { A& e7 = *pip.pool<A>().begin(); }
-        { C& e8 = *pip.pool<C>().begin(); }
-        { F& e9 = *pip.pool<F>().begin(); }
-        { const A& e7 = *pip.pool<const A>().begin(); }
-        { const C& e8 = *pip.pool<const C>().begin(); }
-        { const F& e9 = *pip.pool<const F>().begin(); }
+		//		can be acquired seperately from component or index for gets and contains operations
+		// 
+		
+		pip.unlock();
+	}
 
 
+	//using namespace ecs;
+	//registry reg;
+	//pool<A>& pA = reg.pool<A>();
+	//auto pl_v = pA.view<A>();
 
-        
-    }
+	//pipeline<select<A, B>, from<A>> pip = reg.pipeline<A, B>();
+	
+	//auto pip_v = pip.view<entity, A, B>();
+
+/*
+	auto  pip = reg.pipeline<A, B, C, F, G>();
+	{
+		{ auto& [e, a] = *pip.pool<const A>().begin(); }
+		{ auto& [e, cd] = *pip.pool<const C>().begin(); }
+		{ auto& [e, f, g] = *pip.pool<const F>().begin(); }
+
+		{ auto& [e, a] = *pip.pool<A>().begin(); }
+		{ auto& [e, cd] = *pip.pool<C>().begin(); }
+		{ auto& [e, f, g] = *pip.pool<F>().begin(); }
+
+		{ auto [e, f, c] = *pip.view<F, C>().begin(); }
+
+		{ ecs::entity e = *pip.pool<A>().begin(); }
+		{ ecs::entity e = *pip.pool<C>().begin(); }
+		{ ecs::entity e = *pip.pool<F>().begin(); }
+		{ ecs::entity e = *pip.pool<const A>().begin(); }
+		{ ecs::entity e = *pip.pool<const C>().begin(); }
+		{ ecs::entity e = *pip.pool<const F>().begin(); }
+
+		{ A& a = *pip.pool<A>().begin(); }
+		{ C& c = *pip.pool<C>().begin(); }
+		{ F& f = *pip.pool<F>().begin(); }
+		{ const A& a = *pip.pool<const A>().begin(); }
+		{ const C& c = *pip.pool<const C>().begin(); }
+		{ const F& f = *pip.pool<const F>().begin(); }
+	}
+*/
+	return 0;
 }
-

@@ -1,0 +1,102 @@
+
+//TODO: seperate element and entity for deferred operations
+//		  must store linked list or something to update versions
+//		  for archetype and uniontype the movement of the value would denote a change in bucket which should call a construct/destroy
+//		  entt uses an implicit linked list in the place of the destroyed entity
+//		  issue with entt version is it requires the sparse set to navigate
+//		  I would like to replace the entity version pair with a simple index to the next hole
+//		  the deferred storage doesnt know what its erasing, could cause issues for inplace sorting also
+
+//TODO: bucket sort pool for archetype and uniontype storage policy -> 
+//		  pool buckets <A, B, C, D, AB, AC, AD, BC, BD, CD, ABC, ABD, ACD, BCD, ABCD>
+//		  to check whether an entity has a component you find if the index is within the range from valid buckets
+//		  valid buckets for inc<A,B> = <-, -, -, -, AB, -, -, -, -, -, ABC, ABD, -, -, ABCD>
+//		  
+//		  when reordering pools inplace/swap policy applies to the bucket
+//		  eg entity in bucket ABC drops to bucket AB = <-, -, -, -, AB, -, -, -, -, -, -, ABD, -, -, ->
+//		  AB = [..., x], ABD = [..., x, ...]
+//
+//		  alternatively defer the bucket calculation, ie queue bucket sort
+//		  flag entity with new state
+
+//TODO: explore possibilities of a swap pool -> create multiple buffer for entities, this is a binary semaphore (kinda) not sure how they are normally implemented
+//|   |			|			| concurrency					|										|											|
+//| i | entity  | component | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | view syntax							| pipeline syntax							| explicit syntax
+//+---+---------+-----------+---+---+---+---+---+---+---+---+---------------------------------------+------------------------------------------+----------------------------------
+//| 1 |			| const		| Y |   | Y | Y |   | Y | Y |   | view<base, const comp>				| pipeline<const comp, ...>					| read_only
+//| 2 |			| mutable	|   |   | Y |   |   | Y |   |   | view<base, comp>						| pipeline<comp, ...>						| 
+//| 3 | const   |			| Y | Y | Y | Y | Y |   |   |   | view<base, const entity>				| pipeline<									| 
+//| 4 | const   | const		| Y |   | Y | Y |   |   |   |   | view<base, const entity, const comp>	| pipeline<const id<comp>, const comp, ...>	| 
+//| 5 | const   | mutable	|   |   | Y |   |   |   |   |   | view<base, const entity, comp>		| pipeline<const id<comp>, comp, ...>		| 
+//| 6 | mutable |			| Y | Y |   |   |   |   |   |   | view<base, entity>					| pipeline<id<comp>>						| 
+//| 7 | mutable | const		| Y |   |   |   |   |   |   |   | view<base, entity, const comp>		| pipeline<id<comp>, const comp, ...>		| 
+//| 8 | mutable | mutable	|   |   |   |   |   |   |   |   | view<base, entity, comp>				| pipeline<id<comp>, comp, ...>				| 
+
+//			  I would need to add some syntax to differentiate between get with entity vs index
+//			  
+//			  an idea with that is to do all operations through a view class:
+//			  template<> view<entity> -> pool editor
+//			  view<entity, get<inc_ts...>, exc<exc_ts...>>
+//			  view<get<t, inc_ts...>, exc<exc_ts...>>
+
+//		  if I were to do semaphore behaviour with several clones of the entity/component array
+//		  big risk of a data race/lost processing -> its not trivial to track changes
+//		  this would 100% require a version per entity -> to merge the changes
+//		  I would probably want some kind of default initialization
+//		  this is a slightly insane level of multithreading which may not be needed
+//		  it might also be simpler to do command buffers if I want this level of insanity
+
+2(+1 per component) Mutexes!!!
+one for sparse set, one for packed, one for buffer. yippeeeee, cluster fucking right here!!!
+	this would allow:
+		one mtx check at entities index -> im sure a very common operation
+		one mtx iterate and update entities
+		one mtx iterate and update components
+	this becomes extra useful when doubling the number of entity arrays -> semaphorish
+	I could attach one to the entity, one to the sparse set and update them individually.
+	the component entity can be read only, the sparse set entity can be used to insert and erase entities
+	this can be a swap buffer setup, I dont need the "slow" lookup times of the index map
+
+	pros:
+		read + write concurrency -> const buffer + const sparse, packed + const buffer
+		less lockup from write operations -> packed + const sparse, buffer 
+		adds alot of control for how a policy should interact with the pool eg deferred add does not need buffer access at all until sync
+	cons:
+		more mutex locking overhead
+		added complexity
+		more difficult to sync -> multiple threads will try could be trying to sync at once
+		less intuitive -> when a resource is written to and requires a sync its not obvious which way around that happens. could be seen as an inbuilt syntax for deferred operations but gross
+
+	1(+1 per buffer) mutex
+	1 mutex for sparse_set + packed
+	1 mutex for per buffer
+
+	pipeline<id<A>, index<A>, A>;
+
+	this leads to 3^3-1=26 combinations some of those might be entirely useless
+
+	the second part about doubling the entity arrays is also maybe pointless, it doesnt speed up sync time because you still have to 
+	copy the updated entities to the other buffer
+
+
+// TODO: concurrent dispatcher
+//		  on raising event, increment an atomic size, if capacity reached, sync with a mutex, and reserve new capacity
+//
+//		  there is a lot of fiddling that can be done here, for example:
+//		   - dispatch immediately after invocation (immediate)
+//		   - dispatch upon sender mutex release (deferred)
+//		   - dispatch after reviever mutex acquired (lazy)
+//		   - dispatch when capacity reached (threshold)
+//		   - dispatch periodically after time elapsed (polled) -> event loop or other sillyness
+//		   - dispatch on manual invoke (manual)
+//		  
+//		  doing an event loop would be silly.
+//		  most the multithreading optimizations you can make are application specific so it would be silly to try and write a fit all solution
+//		  given that, it might be best to make threading as manual as possible. 
+
+// NOTE: maybe its better to only allow paged_block ie no unstable pointers, it costs a tiny bit more to iterate but alot more for allocation/insertion...
+
+
+
+
+

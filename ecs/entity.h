@@ -1,14 +1,14 @@
 #pragma once
-#include "fwd.h"
+#include <cstdint>
 
 namespace ecs {
-    class entity  {
-    public:
-        unsigned long int value;
-        constexpr entity() : value(-1) { }
-        entity(unsigned long int v) : value(v) { }
-        constexpr operator unsigned long int() { return value; }
-    };
+	class entity {
+	public:
+		uint32_t value;
+		constexpr entity() : value(-1) { }
+		entity(uint32_t v) : value(v) { }
+		constexpr operator uint32_t() { return value; }
+	};
 
-    entity tombstone;
+	const entity tombstone;
 }
