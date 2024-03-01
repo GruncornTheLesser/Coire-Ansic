@@ -4,7 +4,7 @@
 			"type": "cppbuild",
 			"label": "g++ build",
 			"command": "g++",
-			"args":[ "**.cpp", "-g", "-o", "${workspaceFolderBasename}.exe", "-std=c++23", "-fdiagnostics-color=always", "-fdiagnostics-show-location=once", "-time" ],
+			"args":[ "**.cpp", "-g", "-o", "${workspaceFolderBasename}.exe", "-std=c++23", "-fdiagnostics-color=always", "-fdiagnostics-show-location=once" ],
 			"options": {
 				"cwd": "${workspaceFolder}"
 			},

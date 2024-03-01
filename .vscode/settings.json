@@ -86,4 +86,5 @@
 		"type_traits": "cpp",
 		"*.tpp": "cpp"
 	},
+	//"C_Cpp.default.compilerPath": "C:\\Program Files (x86)\\MSYS\\mingw64\\bin\\g++.exe",
 }
