@@ -1,54 +1,78 @@
-#pragma once
+#include "view.h" 
+// pipeline requires view.h but view.tpp requires pipeline.h
+// this is probably bad
+
+#ifndef ECS_PIPELINE_H
+#define ECS_PIPELINE_H
 #include "util/tuple_util.h"
-#include "pool.h"
 #include "traits.h"
+#include "policy.h"
 
 namespace ecs {
-	template<ecs::traits::resource_class ... ts>
+	template<typename Resource_Set_T, typename Storage_T, typename=void>
+	struct storage_syncer;
+
+	template<typename ... Ts>
 	struct pipeline_t {
-		using resource_set_t = util::tuple_unique_t<util::is_remove_const_same, util::tuple_transform_t<util::to_pointer, util::tuple_transform_t<traits::get_resource_container, std::tuple<ts...>>>>;
+		using resource_container_set = std::tuple<Ts...>;
+		using pipeline_set = 
+			util::tuple_transform_t<std::add_pointer, 								// add pointer
+			util::tuple_union_t<util::cmp<std::is_same, std::remove_const>::type, 	// erase repeats
+			util::tuple_transform_t<traits::get_resource_container, resource_container_set>>>;// get resource containers
 		
-		template<typename u> 
-		static constexpr bool is_accessible = util::tuple_contains_v<u, std::tuple<const ts...>> || util::tuple_contains_v<u, std::tuple<ts...>>;
-		
-		template<typename base_t>
-		pipeline_t(base_t& base);
+		template<typename U>
+		struct is_accessible : util::tuple_subset<util::cmp_disjunction< // match const with const, mut with const or mut
+				util::cmp_transform_rhs<std::is_same, std::remove_const>::type, 
+				util::cmp_transform_rhs<std::is_same, std::add_const>::type>::type,
+				traits::get_resource_set_t<U>, std::tuple<Ts...>>
+		{ };
+
+		template<typename U>
+		static constexpr bool is_accessible_v = is_accessible<U>::value;
+
+		template<typename base_T>
+		pipeline_t(base_T& base);
+
+		pipeline_t(pipeline_t<Ts...>& other) = delete;
+		pipeline_t(pipeline_t<Ts...>&& other);
+
+		pipeline_t& operator=(pipeline_t<Ts...>& other) = delete;
+		pipeline_t& operator=(pipeline_t<Ts...>&& other);
 
 		void lock();
 		void unlock();
+		void sync();
 
-		template<ecs::traits::resource_class u>
-		u& get_resource() requires (is_accessible<u>);
+		template<typename U>
+		U& get_resource() requires (is_accessible_v<U>);
+
+		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename ... Arg_Us>
+		U& emplace(ecs::entity e, Arg_Us&& ... args) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>);
+
+		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename ... Arg_Us>
+		U& emplace(ecs::entity e, Arg_Us&& ... args) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>);
+
+		template<typename U, template<typename> typename Policy_U = deferred>
+		void erase(ecs::entity e) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>);
+
+		template<typename ... Select_Us, 
+			typename from_T = ecs::view_from_builder<ecs::select<Select_Us...>>::type, 
+			typename where_T = ecs::view_where_builder<ecs::select<Select_Us...>, from_T>::type>
+		view<select<Select_Us...>, from_T, where_T, pipeline_t<Ts...>&> view(from_T from = {}, where_T where = {});
+
+		
 
 	private:
-		resource_set_t resource_set;
+		pipeline_set set;
 	};
- 
-	// A horrors beyond human comprehension
-	// stare into the abyss, dive head and fall for all eternity. The light fades and sight is swallowed. 
-	// Drown in an ocean of black, a neverending nothing, The vastness of unknown washes over you, through you. 
-	// You are all that remains, the last bastion of something-anything: you, your self, your sanity. Until even 
-	// that diminishes piece by piece, stripped back, all that is you, all that encompasses your thoughts, 
-	// your feelings, emotions slip between your fingers the broken shards of a shattered mind. leaving only the 
-	// twisting corruption of a maddened mind, twisting under the gaze of that unbearable emptyness. 
-	// Then, and only then could you begin to understand this code.
-	// honestly its not that bad. just convenluted
 
-	
-	template<traits::acquireable ... ts>
-	using pipeline = 
-		util::tuple_unique_t<util::is_remove_const_same, 
-			util::tuple_sort_t<util::remove_const_alpha_cmp, 
-			util::tuple_sort_t<util::non_const_first_cmp,
-			util::tuple_expand_t<pipeline_t<>,									// casts to pipeline, fills with resources
-			util::tuple_filter_t<												// filter all without storage set
-			util::negate_pred<ecs::traits::has_resource_storage_set>::type,
-				std::tuple<ts...>>,
-			typename util::tuple_expand_t<util::tuple_expand<>,					// casts to tuple_expand, and fills with resource sets
-				util::tuple_transform_t<traits::get_resource_storage_set,		// get all storage resources
-				util::tuple_filter_t<ecs::traits::has_resource_storage_set, 	// filter all with storage set
-					std::tuple<ts...>>>>::type
-			>>>>;
+	// gathers and manipulates the set and order of required resources, to maintain consistent locking order and prevent deadlocks
+	template<typename ... Ts>
+	struct pipeline_builder;
+
+	template<typename ... Ts> // resource_class
+	using pipeline = typename pipeline_builder<Ts...>::type;
 }
 
 #include "pipeline.tpp"
+#endif

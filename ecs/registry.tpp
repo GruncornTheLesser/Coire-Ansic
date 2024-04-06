@@ -1,11 +1,24 @@
-#pragma once
+#ifndef ECS_REGISTRY_TPP
+#define ECS_REGISTRY_TPP
+
 #include "registry.h"
 #include "traits.h"
 #include "pool.h"
-#include "pipeline.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdelete-incomplete"
+
+class ecs::registry::erased_ptr
+{
+public:
+	template<typename T>
+	erased_ptr(T* ptr);
+	
+	template<typename T>
+	T& get();
+private:
+	std::unique_ptr<void, std::function<void(void*)>> ptr;
+};
 
 template<typename T>
 ecs::registry::erased_ptr::erased_ptr(T* ptr)
@@ -22,45 +35,33 @@ T& ecs::registry::erased_ptr::get() {
 
 #pragma GCC diagnostic pop
 
-template<ecs::traits::acquireable u, typename ... arg_us>
-u& ecs::registry::try_emplace(arg_us ... args) {
-	std::type_index key = typeid(ecs::traits::get_resource_container_t<u>);
-	data_t::iterator it = data.find(key);
-
-	if (it == data.end())
-	{
-		auto* ptr = new u{ std::forward<arg_us>(args)... };
-		it = data.emplace_hint(it, std::pair(key, ptr));
-	}
-
-	return it->second.get<u>();
+template<typename U, typename ... Arg_Us>
+U& ecs::registry::get_resource(Arg_Us ... args) requires(std::is_constructible_v<U, Arg_Us...>) {
+	// get resource position
+	std::type_index key = typeid(ecs::traits::get_resource_container_t<std::remove_const_t<U>>);
+	resource_data_t::iterator it = data.find(key);
+	if (it == data.end()) // if key not found
+		if constexpr (std::is_constructible_v<U, Arg_Us...>)
+			it = data.emplace_hint(it, key, new U{ std::forward<Arg_Us>(args)... });
+		else
+			throw std::runtime_error(std::string("registry does not contain data/ could not default construct '") + std::string(util::type_name<U>() + "'"));
+	// 
+	return it->second.get<U>();
 }
 
-template<ecs::traits::acquireable u>
-u& ecs::registry::get() const {
-	std::type_index key = typeid(ecs::traits::get_resource_container_t<u>);
-	auto it = data.find(key);
-	it->second.get<u>();
-}
-
-template<ecs::traits::acquireable u>
-void ecs::registry::erase() {
-	data.erase(typeid(ecs::traits::get_resource_container_t<u>));
-}
-
-template<ecs::traits::acquireable u>
-void ecs::registry::try_erase() {
-	auto it = data.find(typeid(ecs::traits::get_resource_container_t<u>));
+template<typename U>
+void ecs::registry::erase_resource() {
+	auto it = data.find(typeid(ecs::traits::get_resource_container_t<U>));
 	if (it != data.end()) data.erase(it);
 }
 
-template<ecs::traits::acquireable u>
-bool ecs::registry::contains() const {
-	auto it = data.find(typeid(ecs::traits::get_resource_container_t<u>));
-	return it != data.end();
+template<typename ... Us>
+ecs::pipeline<Us...> ecs::registry::pipeline() {
+	return ecs::pipeline<Us...>{ *this };
 }
 
-template<ecs::traits::acquireable ... us>
-ecs::pipeline<us...> ecs::registry::pipeline() {
-	return ecs::pipeline<us...>{ *this };
+template<typename ... Us, typename from_T, typename where_T>
+ecs::view<ecs::select<Us...>, from_T, where_T> ecs::registry::view(from_T, where_T) {
+	return { *this };
 }
+#endif

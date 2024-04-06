@@ -1,9 +1,10 @@
-#pragma once
+#ifndef ECS_SPARSE_MAP_H
+#define ECS_SPARSE_MAP_H
 #include <memory>
 #include <exception>
 #include <cassert>
+#include <algorithm>
 #include "next_pow2.h"
-
 namespace util {
 	template<typename val_t, val_t tombstone = static_cast<val_t>(-1)>
 	class sparse_map {
@@ -99,34 +100,34 @@ namespace util {
 		size_t  page_capacity;
 	};
 
-	template<typename t> struct paged_block;
-	template<typename t> struct paged_block_iterator;
+	template<typename T> class paged_block;
+	template<typename T> class paged_block_iterator;
 	
-	template<typename t> struct unpaged_block;
-	template<typename t> struct unpaged_block_iterator;
+	template<typename T> class unpaged_block;
+	template<typename T> class unpaged_block_iterator;
 
-	template<typename t>
-	struct paged_block {
+	template<typename T>
+	class paged_block {
 	public:
 		static constexpr size_t page_size = 4096;
 	private:
-		using page = t*;
+		using page = T*;
 		
-		using reference = t&;
-		using const_reference = const t&;
+		using reference = T&;
+		using const_reference = const T&;
 		
-		using iterator = paged_block_iterator<t>;
-		using const_iterator = paged_block_iterator<const t>;
+		using iterator = paged_block_iterator<T>;
+		using const_iterator = paged_block_iterator<const T>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 	public:
 		paged_block(size_t page_capacity = 8, size_t page_count = 1) : page_capacity(page_capacity), page_count(page_count), pages(std::allocator<page>().allocate(page_capacity)) { 
-			std::for_each(pages, pages + page_count, [](page& page) { page = std::allocator<t>().allocate(page_size); });
+			std::for_each(pages, pages + page_count, [](page& page) { page = std::allocator<T>().allocate(page_size); });
 		}
 		
 		~paged_block() {
-			std::for_each(pages, pages + page_count, [](page p) { std::allocator<t>().deallocate(p, page_size); });
+			std::for_each(pages, pages + page_count, [](page p) { std::allocator<T>().deallocate(p, page_size); });
 			std::allocator<page>().deallocate(pages, page_capacity);
 		}
 
@@ -137,6 +138,7 @@ namespace util {
 		
 		reverse_iterator rbegin() { return iterator{ page_count * page_size - 1, pages }; }
 		reverse_iterator rend() { return iterator{ -1, pages }; }
+		
 		const_reverse_iterator rbegin() const { return iterator{ page_count * page_size - 1, pages }; }
 		const_reverse_iterator rend() const { return iterator{ -1, pages }; }
 		
@@ -166,12 +168,12 @@ namespace util {
 					pages = new_pages;
 				}
 
-				std::for_each(pages + page_count, pages + new_page_count, [](page& page) { page = std::allocator<t>().allocate(page_size); });
+				std::for_each(pages + page_count, pages + new_page_count, [](page& page) { page = std::allocator<T>().allocate(page_size); });
 			}
 			else if (new_page_count + 1 < page_count)
 			{
 				new_page_count += 1;
-				std::for_each(pages + new_page_count, pages + page_count, [](page page) { std::allocator<t>().deallocate(page, page_size); });
+				std::for_each(pages + new_page_count, pages + page_count, [](page page) { std::allocator<T>().deallocate(page, page_size); });
 			
 			}
 
@@ -186,47 +188,49 @@ namespace util {
 		page* pages;
 	};
 
-	template<typename t>
-	struct paged_block_iterator {
-		paged_block_iterator(size_t index, t** pages) : index(index), pages(pages) { }
+	template<typename T>
+	class paged_block_iterator {
+	public:
+		paged_block_iterator(size_t index, T** pages) : index(index), pages(pages) { }
 		
-		t& operator*() { return pages[index / paged_block<t>::page_size][index % paged_block<t>::page_size]; }
+		T& operator*() { return pages[index / paged_block<T>::page_size][index % paged_block<T>::page_size]; }
 		
-		paged_block_iterator<t> operator++() { ++index; return *this; }
-		paged_block_iterator<t> operator++(int) { paged_block_iterator<t> temp = *this; ++index; return temp; }
-		paged_block_iterator<t> operator--() { --index; return *this; }
-		paged_block_iterator<t> operator--(int) { paged_block_iterator<t> temp = *this; --index; return temp; }
-		paged_block_iterator<t> operator+(int n) { return { index + n, pages }; }
-		paged_block_iterator<t> operator-(int n) { return { index - n, pages }; }
+		paged_block_iterator<T> operator++() { ++index; return *this; }
+		paged_block_iterator<T> operator++(int) { paged_block_iterator<T> temp = *this; ++index; return temp; }
+		paged_block_iterator<T> operator--() { --index; return *this; }
+		paged_block_iterator<T> operator--(int) { paged_block_iterator<T> temp = *this; --index; return temp; }
+		paged_block_iterator<T> operator+(int n) { return { index + n, pages }; }
+		paged_block_iterator<T> operator-(int n) { return { index - n, pages }; }
 		
-		ptrdiff_t operator-(const paged_block_iterator<t>& other) { return index - other.index; }
+		ptrdiff_t operator-(const paged_block_iterator<T>& other) { return index - other.index; }
 		
-		bool operator==(const paged_block_iterator<t>& other) { return index == other.index; }
-		bool operator!=(const paged_block_iterator<t>& other) { return index != other.index; }
-		bool operator<(const paged_block_iterator<t>& other) { return index < other.index; }
-		bool operator>(const paged_block_iterator<t>& other) { return index > other.index; }
-		bool operator<=(const paged_block_iterator<t>& other) { return index <= other.index; }
-		bool operator>=(const paged_block_iterator<t>& other) { return index >= other.index; }
+		bool operator==(const paged_block_iterator<T>& other) { return index == other.index; }
+		bool operator!=(const paged_block_iterator<T>& other) { return index != other.index; }
+		bool operator<(const paged_block_iterator<T>& other) { return index < other.index; }
+		bool operator>(const paged_block_iterator<T>& other) { return index > other.index; }
+		bool operator<=(const paged_block_iterator<T>& other) { return index <= other.index; }
+		bool operator>=(const paged_block_iterator<T>& other) { return index >= other.index; }
 		
 	private:
 		size_t index;
-		t** pages;
+		T** pages;
 	};
 
-	template<typename t> 
-	struct unpaged_block {
-		using reference = t&;
-		using const_reference = const t&;
+	template<typename T> 
+	class unpaged_block {
+	public:
+		using reference = T&;
+		using const_reference = const T&;
 		
-		using iterator = unpaged_block_iterator<t>;
-		using const_iterator = unpaged_block_iterator<const t>;
+		using iterator = unpaged_block_iterator<T>;
+		using const_iterator = unpaged_block_iterator<const T>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-		unpaged_block(size_t cap = 4096) : cap(cap), data(std::allocator<t>().allocate(cap)) { }
+		unpaged_block(size_t cap = 4096) : cap(cap), data(std::allocator<T>().allocate(cap)) { }
 		
 		~unpaged_block() {
-			std::allocator<t>().deallocate(data, cap);
+			std::allocator<T>().deallocate(data, cap);
 		}
 
 		iterator begin() { return { data }; }
@@ -249,9 +253,9 @@ namespace util {
 		{
 			if (n > cap) {
 				size_t new_cap = util::next_pow2(n);
-				t* new_data = std::allocator<t>().allocate(new_cap);
+				T* new_data = std::allocator<T>().allocate(new_cap);
 				std::move(data, data + prev_size_hint, new_data);
-				std::allocator<t>().deallocate(data, cap);
+				std::allocator<T>().deallocate(data, cap);
 				data = new_data;
 				cap = new_cap;
 			}
@@ -260,34 +264,36 @@ namespace util {
 		size_t capacity() const { return cap; }
 	private:
 		size_t cap;
-		t* data;
+		T* data;
 	};
 
-	template<typename t>
-	struct unpaged_block_iterator {
-		
-		unpaged_block_iterator(t* ptr) : ptr(ptr) { }
+	template<typename T>
+	class unpaged_block_iterator {
+	public:
+		unpaged_block_iterator(T* ptr) : ptr(ptr) { }
 
-		t&  operator*() { return *ptr; }
+		T&  operator*() { return *ptr; }
 		
-		unpaged_block_iterator<t> operator++() { ++ptr; return *this; }
-		unpaged_block_iterator<t> operator++(int) { unpaged_block_iterator<t> temp = *this; ++ptr; return temp; }
-		unpaged_block_iterator<t> operator--() { --ptr; return *this; }
-		unpaged_block_iterator<t> operator--(int) { unpaged_block_iterator<t> temp = *this; --ptr; return temp; }
-		unpaged_block_iterator<t> operator+(int n) { return { ptr + n }; }
-		unpaged_block_iterator<t> operator-(int n) { return { ptr - n }; }
+		unpaged_block_iterator<T> operator++() { ++ptr; return *this; }
+		unpaged_block_iterator<T> operator++(int) { unpaged_block_iterator<T> temp = *this; ++ptr; return temp; }
+		unpaged_block_iterator<T> operator--() { --ptr; return *this; }
+		unpaged_block_iterator<T> operator--(int) { unpaged_block_iterator<T> temp = *this; --ptr; return temp; }
+		unpaged_block_iterator<T> operator+(int n) { return { ptr + n }; }
+		unpaged_block_iterator<T> operator-(int n) { return { ptr - n }; }
 		
 		ptrdiff_t operator-(const unpaged_block_iterator& other) { return ptr - other.ptr; }
 		
-		bool operator==(const unpaged_block_iterator<t>& other) { return ptr == other.ptr; }
-		bool operator!=(const unpaged_block_iterator<t>& other) { return ptr != other.ptr; }
-		bool operator<(const unpaged_block_iterator<t>& other) { return ptr < other.ptr; }
-		bool operator>(const unpaged_block_iterator<t>& other) { return ptr > other.ptr; }
-		bool operator<=(const unpaged_block_iterator<t>& other) { return ptr <= other.ptr; }
-		bool operator>=(const unpaged_block_iterator<t>& other) { return ptr >= other.ptr; }
+		bool operator==(const unpaged_block_iterator<T>& other) { return ptr == other.ptr; }
+		bool operator!=(const unpaged_block_iterator<T>& other) { return ptr != other.ptr; }
+		bool operator<(const unpaged_block_iterator<T>& other) { return ptr < other.ptr; }
+		bool operator>(const unpaged_block_iterator<T>& other) { return ptr > other.ptr; }
+		bool operator<=(const unpaged_block_iterator<T>& other) { return ptr <= other.ptr; }
+		bool operator>=(const unpaged_block_iterator<T>& other) { return ptr >= other.ptr; }
 		
 	private:
-		t* ptr;
+		T* ptr;
 	};
 
 }
+
+#endif

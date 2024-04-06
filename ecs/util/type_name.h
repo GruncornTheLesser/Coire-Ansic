@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ECS_TYPE_NAME_H
+#define ECS_TYPE_NAME_H
 #include <string_view>
 
 #if defined(__clang__)
@@ -7,7 +8,7 @@
 	#define PRETTY_FUNCTION_SUFFIX "]"
 #elif defined(__GNUC__) && !defined(__clang__)
 	#define COMPILER_PRETTY_FUNCTION __PRETTY_FUNCTION__
-	#define PRETTY_FUNCTION_PREFIX "constexpr std::basic_string_view<char> util::type_name() [with t = "
+	#define PRETTY_FUNCTION_PREFIX "constexpr std::basic_string_view<char> util::type_name() [with T = "
 	#define PRETTY_FUNCTION_SUFFIX "]"
 #elif defined(_MSC_VER)
 	#define COMPILER_PRETTY_FUNCTION __FUNCSIG__
@@ -18,7 +19,12 @@
 #endif
 
 namespace util { // NOTE: when changing the namespace of this func you must update the macros for pretty function
-	template<typename t> constexpr std::basic_string_view<char> type_name() {
+	template<typename T> constexpr std::basic_string_view<char> type_name() {
 		return { COMPILER_PRETTY_FUNCTION + sizeof(PRETTY_FUNCTION_PREFIX) - 1, sizeof(COMPILER_PRETTY_FUNCTION) + 1 - sizeof(PRETTY_FUNCTION_PREFIX) - sizeof(PRETTY_FUNCTION_SUFFIX) };
 	}
+
+	template<typename LHS_T, typename RHS_T> 
+	struct alpha_lt : std::bool_constant<util::type_name<LHS_T>() < util::type_name<RHS_T>()> { };
 }
+
+#endif

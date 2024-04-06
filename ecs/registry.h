@@ -1,48 +1,36 @@
-#pragma once
+#ifndef ECS_REGISTRY_H
+#define ECS_REGISTRY_H
 #include <shared_mutex>
 #include <functional>
 #include <typeindex>
 #include <memory>
+
 #include "traits.h"
+#include "view.h" 
 #include "pipeline.h"
+
 namespace ecs {
 	class registry {
-		class erased_ptr {
-		public:
-			template<typename T>
-			erased_ptr(T* ptr);
-
-			template<typename T>
-			T& get();
-
-		private:
-			std::unique_ptr<void, std::function<void(void*)>> ptr;
-		};
-
-		using data_t = std::unordered_map<std::type_index, erased_ptr>;
-
+		class erased_ptr;
+		using resource_data_t = std::unordered_map<std::type_index, erased_ptr>;
 	public:
-		template<traits::acquireable u, typename ... arg_us>
-		u& try_emplace(arg_us ... args);
+		template<typename U, typename ... Arg_Us>
+		U& get_resource(Arg_Us ... args) requires(std::is_constructible_v<U, Arg_Us...>);
 
-		template<traits::acquireable u>
-		u& get() const;
+		template<typename U>
+		void erase_resource();
 
-		template<traits::acquireable u>
-		void erase();
+		template<typename ... Us>
+		pipeline<Us...> pipeline();
 
-		template<traits::acquireable u>
-		void try_erase();
-
-		template<traits::acquireable u>
-		bool contains() const;
-
-		template<traits::acquireable ... us>
-		pipeline<us...> pipeline();
-
+		template<typename ... Us, 
+			typename from_T = ecs::view_from_builder_t<ecs::select<Us...>>, 
+			typename where_T = ecs::view_where_builder_t<ecs::select<Us...>, from_T>>
+		view<select<Us...>, from_T, where_T> view(from_T from = {}, where_T where = {});
 	private:
-		data_t data;
+		resource_data_t data;
 	};
 }
 
 #include "registry.tpp"
+#endif
