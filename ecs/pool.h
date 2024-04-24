@@ -15,11 +15,21 @@ namespace ecs {
 		void release() { mtx.unlock(); };
 		void acquire() const { mtx.lock_shared(); };
 		void release() const { mtx.unlock_shared(); };
+	private:
 		mutable std::shared_mutex mtx;
 	};
 	
 	template<typename ... Ts>
 	struct archetype {
+		// TODO: maybe. combine component and index resources?????
+		// index is the most useless resource, can be used for contains and index lookups. 
+		// operation:
+		//		immediate emplace/erase -> index, entity, comp
+		//		deferred emplace/erase -> entity
+		// 		swap -> index
+		//		iterate -> entity, comp 
+		//		retrieve -> index, comp
+
 		// resource attributes
 		template<typename U>
 		struct comp : public resource, util::paged_block<U> {
@@ -32,6 +42,11 @@ namespace ecs {
 
 		struct entity : public resource, util::unpaged_block<std::pair<ecs::entity, uint32_t>> {
 			using resource_container = archetype<Ts...>;
+		
+			size_t& size() { return n; }
+			size_t size() const { return n; }
+		private:
+			size_t n = 0;
 		};
 
 		using resource_set = std::tuple<comp<Ts>..., index, entity>;
@@ -46,6 +61,14 @@ namespace ecs {
 		template<typename ... Us>
 		void sync() {
 			((std::cout << "syncing: " << util::type_name<Us>() << std::endl), ...);
+			// TODO: finish me
+			// NOTE: can deadlock if needs to acquire new resource oopsies
+			// deferred -> 
+			
+			
+			// iterate through entity update list
+			// swap component at index 1 with component at index of entity at index 1
+			//  
 		}
 	private:
 		resource_set data;

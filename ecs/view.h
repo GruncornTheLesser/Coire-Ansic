@@ -55,7 +55,7 @@ namespace ecs {
 	public:
 		using pip_storage = std::conditional_t<std::is_reference_v<pip_T>, pip_T, pip_T&>;
 		using iterator = view_iterator<select_T, from_T, where_T, pip_T>;
-		using const_iterator = view_iterator<util::tuple_transform_t<std::add_const, select_T>, from_T, where_T, pip_T>;
+		using const_iterator = view_iterator<util::tuple_for_each_t<std::add_const, select_T>, from_T, where_T, pip_T>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -80,7 +80,7 @@ namespace ecs {
 	class view_iterator {
 	public:
 		using reference = view_reference<select_T, from<from_T>, pip_T>;
-		using const_reference = view_reference<util::tuple_transform_t<std::add_const, select_T>, from_T, pip_T>;
+		using const_reference = view_reference<util::tuple_for_each_t<std::add_const, select_T>, from_T, pip_T>;
 		
 		view_iterator(pip_T& pip, size_t index);
 

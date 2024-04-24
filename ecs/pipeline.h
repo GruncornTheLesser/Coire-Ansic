@@ -8,27 +8,16 @@
 #include "traits.h"
 #include "policy.h"
 
-namespace ecs {
-	template<typename Resource_Set_T, typename Storage_T, typename=void>
-	struct storage_syncer;
+// TODO: isolate template members eg resource set to traits class -> allow for defaulting for eg component 
 
+namespace ecs {
 	template<typename ... Ts>
 	struct pipeline_t {
 		using resource_container_set = std::tuple<Ts...>;
 		using pipeline_set = 
-			util::tuple_transform_t<std::add_pointer, 								// add pointer
+			util::tuple_for_each_t<std::add_pointer, 								// add pointer
 			util::tuple_union_t<util::cmp<std::is_same, std::remove_const>::type, 	// erase repeats
-			util::tuple_transform_t<traits::get_resource_container, resource_container_set>>>;// get resource containers
-		
-		template<typename U>
-		struct is_accessible : util::tuple_subset<util::cmp_disjunction< // match const with const, mut with const or mut
-				util::cmp_transform_rhs<std::is_same, std::remove_const>::type, 
-				util::cmp_transform_rhs<std::is_same, std::add_const>::type>::type,
-				traits::get_resource_set_t<U>, std::tuple<Ts...>>
-		{ };
-
-		template<typename U>
-		static constexpr bool is_accessible_v = is_accessible<U>::value;
+			util::tuple_for_each_t<traits::get_resource_container, resource_container_set>>>;// get resource containers
 
 		template<typename base_T>
 		pipeline_t(base_T& base);
@@ -43,19 +32,37 @@ namespace ecs {
 		void unlock();
 		void sync();
 
-		template<typename U>
-		U& get_resource() requires (is_accessible_v<U>);
+		template<traits::pipeline_accessible_class<pipeline_t<Ts...>> U>
+		U& get_resource();
 
-		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename ... Arg_Us>
-		U& emplace(ecs::entity e, Arg_Us&& ... args) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>);
+		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename ... Arg_Us> 
+			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>) && 
+			std::is_constructible_v<U, Arg_Us...>
+		U& emplace(ecs::entity e, Arg_Us&& ... args);
+		
+		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename It, typename ... Arg_Us> 
+			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>) && 
+			std::is_constructible_v<U, Arg_Us...>
+		U& emplace(It first, It last, Arg_Us&& ... args);
 
-		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename ... Arg_Us>
-		U& emplace(ecs::entity e, Arg_Us&& ... args) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>);
+		template<typename U, typename Policy_U, typename ... Arg_Us> 
+			requires (traits::is_pipeline_accessible_v<Policy_U, pipeline_t<Ts...>>) && 
+			std::is_constructible_v<U, Arg_Us...>
+		U& emplace(Policy_U pol, ecs::entity e, Arg_Us&& ... args);
+		
+		template<typename U, typename Policy_U, typename It, typename ... Arg_Us>
+			requires (traits::is_pipeline_accessible_v<Policy_U, pipeline_t<Ts...>>)
+		U& emplace(Policy_U pol, It first, It last, Arg_Us&& ... args);
 
-		template<typename U, template<typename> typename Policy_U = deferred>
-		void erase(ecs::entity e) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>);
+		template<typename U, template<typename> typename Policy_U = deferred> 
+			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>)
+		void erase(ecs::entity e);
 
-		template<typename ... Select_Us, 
+		template<typename U, template<typename> typename Policy_U = deferred, typename It> 
+			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>)
+		void erase(It first, It last);
+
+		template<traits::pipeline_accessible_class<pipeline_t<Ts...>> ... Select_Us, 
 			typename from_T = ecs::view_from_builder<ecs::select<Select_Us...>>::type, 
 			typename where_T = ecs::view_where_builder<ecs::select<Select_Us...>, from_T>::type>
 		view<select<Select_Us...>, from_T, where_T, pipeline_t<Ts...>&> view(from_T from = {}, where_T where = {});

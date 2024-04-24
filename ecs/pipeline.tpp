@@ -11,10 +11,10 @@ struct ecs::pipeline_builder
 	using type = 
 		util::tuple_sort_t<util::cmp<util::alpha_lt, std::remove_const>::type, 	// sort for consistent locking order 
 		util::tuple_union_t<util::cmp<std::is_same, std::remove_const>::type,	// remove repeats
-		util::tuple_sort_t<util::inv_cmp_if<std::is_const>::type,				// prioritizes mutable over const
-		util::tuple_concat_t<ecs::pipeline_t<>, 								// cast to pipeline
-		std::conditional_t<std::is_const_v<Ts>, 								// if const
-			util::tuple_transform_t<std::add_const, 							
+		util::tuple_sort_t<util::inv_cmp_from_if<std::is_const>::type,				// prioritizes mutable over const
+		util::tuple_concat_t<ecs::pipeline_t<>,									// cast to pipeline
+		std::conditional_t<std::is_const_v<Ts>,									// if const
+			util::tuple_for_each_t<std::add_const, 							
 			ecs::traits::get_resource_set_t<Ts>>, 								// cast const to resource set
 			ecs::traits::get_resource_set_t<Ts>>...>>>>; 						// get resource set
 };
@@ -57,8 +57,8 @@ void ecs::pipeline_t<Ts...>::unlock() {
 }
 
 template<typename ... Ts>
-template<typename U>
-U& ecs::pipeline_t<Ts...>::get_resource() requires (is_accessible_v<U>) {
+template<ecs::traits::pipeline_accessible_class<ecs::pipeline_t<Ts...>> U>
+U& ecs::pipeline_t<Ts...>::get_resource() {
 	if constexpr (traits::has_resource_container_v<U>)
 		return std::get<typename traits::get_resource_container_t<U>*>(set)->template get_resource<U>();
 	else
@@ -67,19 +67,23 @@ U& ecs::pipeline_t<Ts...>::get_resource() requires (is_accessible_v<U>) {
 
 template<typename ... Ts>
 template<typename U, template<typename> typename Policy_U, typename ... Arg_Us>
-U& ecs::pipeline_t<Ts...>::emplace(entity e, Arg_Us&& ... args) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>) 
+	requires (ecs::traits::is_pipeline_accessible_v<Policy_U<U>, ecs::pipeline_t<Ts...>>) && 
+	std::is_constructible_v<U, Arg_Us...>
+U& ecs::pipeline_t<Ts...>::emplace(entity e, Arg_Us&& ... args)
 {
 	return Policy_U<U>::template emplace(*this, e, std::forward<Arg_Us>(args)...);
 }
 
 template<typename ... Ts>
 template<typename U, template<typename> typename Policy_U>
-void ecs::pipeline_t<Ts...>::erase(entity e) requires (util::tuple_allof_v<is_accessible, traits::get_resource_set_t<Policy_U<U>>>) {
+	requires (ecs::traits::is_pipeline_accessible_v<Policy_U<U>, ecs::pipeline_t<Ts...>>)
+void ecs::pipeline_t<Ts...>::erase(entity e)
+{
 	Policy_U<U>::template erase(*this, e);
 }
 
 template<typename ... Ts>
-template<typename ... Us, typename from_T, typename where_T>
+template<ecs::traits::pipeline_accessible_class<ecs::pipeline_t<Ts...>> ... Us, typename from_T, typename where_T>
 ecs::view<ecs::select<Us...>, from_T, where_T, ecs::pipeline_t<Ts...>&> 
 ecs::pipeline_t<Ts...>::view(from_T, where_T) {
 	return *this;

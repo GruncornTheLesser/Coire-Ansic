@@ -272,7 +272,7 @@ namespace util {
 	public:
 		unpaged_block_iterator(T* ptr) : ptr(ptr) { }
 
-		T&  operator*() { return *ptr; }
+		T& operator*() { return *ptr; }
 		
 		unpaged_block_iterator<T> operator++() { ++ptr; return *this; }
 		unpaged_block_iterator<T> operator++(int) { unpaged_block_iterator<T> temp = *this; ++ptr; return temp; }

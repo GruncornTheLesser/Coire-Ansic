@@ -55,6 +55,10 @@ namespace ecs::traits {
 	template<typename T> concept resource_class = is_resource<T>::value;
 	template<typename T, typename resource_set_T> concept storage_class = is_storage<T, get_resource_set_t<resource_set_T>>::value;
 	template<typename T, typename resource_set_T> concept acquirable_class = is_acquirable<T, resource_set_T>::value;
+
+	template<typename T, typename Pip_T> struct is_pipeline_accessible;
+	template<typename T, typename Pip_T> static constexpr bool is_pipeline_accessible_v = is_pipeline_accessible<T, Pip_T>::value; 
+	template<typename T, typename Pip_T> concept pipeline_accessible_class = is_pipeline_accessible<T, Pip_T>::value;
 }
 #include "traits.tpp"
 #endif

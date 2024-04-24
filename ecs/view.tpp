@@ -15,10 +15,9 @@ struct ecs::select {
 		util::inv_cmp_to<std::is_same, ecs::entity, std::remove_const>::type, 
 		std::tuple<typename pool<Ts>::template comp<Ts>...>>;
 
-	using retrieve_set = util::tuple_transform_t<
-		util::conditional_transform<
-			util::inv_cmp_to<std::is_same, ecs::entity, std::remove_cvref>::type, 
-			std::add_lvalue_reference>::type, 
+	using retrieve_set = util::tuple_for_each_if_t<
+		util::inv_cmp_to<std::is_same, ecs::entity, std::remove_cvref>::type, 
+		std::add_lvalue_reference, 
 		util::tuple_filter_t<
 			util::inv_match<std::is_empty>::type,
 			std::tuple<Ts...>>>;
@@ -231,8 +230,11 @@ bool ecs::view_iterator<select_T, from_T, where_T, pip_T>::operator>=(const view
 
 template<typename select_T, typename from_T, typename pip_T>
 ecs::view_reference<select_T, from_T, pip_T>::view_reference(pip_T& base, size_t i) : pip(base), ind(i) {
-	//if constexpr (util::tuple_anyof_v<util::cmp_to<std::is_same, ecs::entity, std::remove_cvref>::type, select_T>) 
-	ent = pip.template get_resource<typename from_T::pool::entity>().operator[](ind);
+	//if constexpr (util::tuple_anyof_v<util::cmp_to<std::is_same, ecs::entity, std::remove_cvref>::type, select_T>)
+	// if has entity selected or more than one comp pool being iterated
+	// util::tuple_anyof_v<util::cmp_to<std::is_same, ecs::entity, std::remove_cvref>::type, select_T>
+	// util::tuple_size_v<util::tuple_union<util::transform<>>>>
+	ent = pip.template get_resource<typename from_T::pool::entity>().operator[](ind).first;
 }
 
 template<typename select_T, typename from_T, typename pip_T>
@@ -240,14 +242,13 @@ template<size_t N>
 std::tuple_element_t<N, ecs::view_reference<select_T, from_T, pip_T>> 
 ecs::view_reference<select_T, from_T, pip_T>::get() {
 	using type = std::remove_cvref_t<std::tuple_element_t<N, view_reference>>; 
+	using index_lookup_t = typename traits::get_pool_t<type>::index;
+	using comp_array_t = traits::get_pool_t<type>::template comp<type>;
 	
 	if constexpr (std::is_same_v<ecs::entity, type>)
 		return ent;
 	else
 	{
-		using index_lookup_t = typename traits::get_pool_t<type>::index;
-		using comp_array_t = traits::get_pool_t<type>::template comp<type>;
-
 		if constexpr (std::is_same_v<traits::get_pool_t<type>, std::remove_cvref_t<typename from_T::pool>>)
 			return pip.template get_resource<comp_array_t>()[ind];
 		else 

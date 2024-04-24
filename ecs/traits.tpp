@@ -17,13 +17,11 @@ namespace ecs::traits {
 		decltype(std::declval<T>().template sync<Ts>())..., 
 		decltype(std::declval<T>().template get<Ts>())...>> : std::true_type { };
 
-	/*
-	 :  
-	*/
-
-	template<typename T, typename resource_set_T> struct is_acquirable : 
-		std::disjunction<util::tuple_contains<std::is_same, T, resource_set_T>, 
-		util::tuple_contains<std::is_same, T, util::tuple_transform_t<std::add_const, resource_set_T>>> { };
+	template<typename T, typename Pip_T> struct is_pipeline_accessible : 
+		util::is_subset<util::cmp_disjunction< // match const with const, mut with const or mut
+		util::cmp_transform_rhs<std::is_same, std::remove_const>::type, 
+		util::cmp_transform_rhs<std::is_same, std::add_const>::type>::type,
+		traits::get_resource_set_t<T>, Pip_T> { };
 
 }
 
