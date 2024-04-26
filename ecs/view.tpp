@@ -11,16 +11,19 @@
 
 template<typename ... Ts>
 struct ecs::select {
-	using resource_set = util::tuple_filter_t<
-		util::inv_cmp_to<std::is_same, ecs::entity, std::remove_const>::type, 
-		std::tuple<typename pool<Ts>::template comp<Ts>...>>;
+	using resource_set = util::trn::filter_t<std::tuple<typename pool<Ts>::template comp<Ts>...>,
+		util::mtc::build::compare_to<util::cmp::build::transformed<
+			std::is_same, std::remove_const>::template type, ecs::entity>::template negated>;
 
-	using retrieve_set = util::tuple_for_each_if_t<
-		util::inv_cmp_to<std::is_same, ecs::entity, std::remove_cvref>::type, 
-		std::add_lvalue_reference, 
-		util::tuple_filter_t<
-			util::inv_match<std::is_empty>::type,
-			std::tuple<Ts...>>>;
+	using retrieve_set = util::trn::each_t<util::trn::filter_t<std::tuple<Ts...>,
+			util::mtc::build::negate<std::is_empty>::type>, // for each type in filtered for set of not empty
+			util::trn::build::conditional<
+				util::mtc::build::compare_to<
+					util::cmp::build::transformed<std::is_same, std::remove_cvref>::type, 
+					ecs::entity
+				>::negated, // not equal to entity
+				std::add_lvalue_reference 
+			>::type>;
 };
 template<typename T>
 struct ecs::from {
@@ -29,7 +32,7 @@ struct ecs::from {
 };
 template<typename ... Ts>
 struct ecs::where {
-	using resource_set = util::tuple_concat_t<traits::get_resource_set_t<Ts>...>;
+	using resource_set = util::trn::concat_t<util::trn::each_t<std::tuple<Ts...>, traits::get_resource_set>>;
 
 	template<typename pip_T>
 	static bool check(pip_T& pip, ecs::entity ent) {
@@ -64,15 +67,12 @@ struct ecs::exclude {
 template<typename select_T>
 struct ecs::view_from_builder { 
 	using type = from<std::tuple_element_t<0, 
-		util::tuple_filter<util::inv_cmp_to<std::is_same, ecs::entity>::type, 
-		util::tuple_concat_t<std::tuple<>, select_T>>>>;
+		util::trn::filter<util::trn::rewrap<select_T, std::tuple>, util::mtc::build::compare_to<std::is_same, ecs::entity>::template type>>>;
 };
 template<typename select_T, typename from_T>
 struct ecs::view_where_builder<select_T, ecs::from<from_T>> {
-	using type = ecs::where<
-		util::tuple_concat_t<include<>, 
-		util::tuple_filter_t<util::cmp_to<traits::same_pool, from_T>::template type, // remove if it has the same pool as from_T
-		select_T>>>;
+	using type = util::trn::filter_t<select_T, util::mtc::build::compare_to<
+		util::cmp::build::transformed<std::is_same, std::remove_const>::template type, from_T>::template type>;
 };
 template<typename ... select_Ts, typename from_T, typename ... where_Ts>
 struct ecs::view_pipeline_builder<ecs::select<select_Ts...>, ecs::from<from_T>, ecs::where<where_Ts...>> {

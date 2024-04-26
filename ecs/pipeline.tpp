@@ -8,7 +8,34 @@
 template<typename ... Ts>
 struct ecs::pipeline_builder
 {
-	using type = 
+	using type = util::trn::set_t<std::tuple<Ts...>, 
+		util::trn::build::each< // for each T
+			util::trn::build::post_conditional<
+				util::trn::build::set< // gets resource set, checks if is resource, gets pool resource set if not, 
+					ecs::traits::get_resource_set/*, // get required resources
+					
+					util::trn::build::each<
+						util::trn::build::conditional< // conditional each
+							util::mtc::build::negate<ecs::traits::is_resource>::template type, // if not resource 
+							util::trn::build::set<ecs::traits::get_pool, ecs::traits::get_resource_set>::template type, // get resource pool of requested type
+							util::trn::build::wrap<std::tuple>::template type
+						>::template type // end conditional
+					>::template type, // end each
+					util::trn::build::concat::template type*/
+				>::template type, // end set
+				std::is_const, util::trn::build::each<std::add_const>::template type // if was const, add const to each
+			>::template type // end post conditional
+		>::template type, // end each
+		util::trn::build::concat::template type, // concat resources together
+		util::trn::build::unique<util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type, // remove duplicates
+		util::trn::build::sort<util::alpha_lt>::template type, // sort types by name
+		util::trn::build::sort<util::cmp::build::prioritize_if<std::is_const>::template negated>::template type, // sort type by const
+		util::trn::build::rewrap<ecs::pipeline_t>::template type
+		>;
+
+
+/*
+
 		util::tuple_sort_t<util::cmp<util::alpha_lt, std::remove_const>::type, 	// sort for consistent locking order 
 		util::tuple_union_t<util::cmp<std::is_same, std::remove_const>::type,	// remove repeats
 		util::tuple_sort_t<util::inv_cmp_from_if<std::is_const>::type,				// prioritizes mutable over const
@@ -17,6 +44,10 @@ struct ecs::pipeline_builder
 			util::tuple_for_each_t<std::add_const, 							
 			ecs::traits::get_resource_set_t<Ts>>, 								// cast const to resource set
 			ecs::traits::get_resource_set_t<Ts>>...>>>>; 						// get resource set
+
+	
+	>;
+	*/
 };
 
 template<typename resource_set, typename base_T>
@@ -99,8 +130,8 @@ struct storage_syncer<std::tuple<Resource_Set_Ts...>, Storage_T> {
 
 template<typename Resource_Set_T, typename Storage_T>
 void sync_storage(Storage_T* storage) {
-	storage_syncer<util::tuple_intersect_t<util::cmp<std::is_same, std::remove_const>::type, 
-		Resource_Set_T, ecs::traits::get_synchronization_set_t<Storage_T>>, Storage_T>::sync(storage);
+	storage_syncer<util::trn::set_intersect_t<Resource_Set_T, ecs::traits::get_synchronization_set_t<Storage_T>,
+		util::cmp::build::transformed<std::is_same, std::remove_const>::template type>, Storage_T>::sync(storage);
 }
 
 template<typename ... Ts>

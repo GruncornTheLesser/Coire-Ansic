@@ -6,7 +6,7 @@
 #include "util/next_pow2.h"
 #include "entity.h"
 #include "traits.h" 
-
+#include "util/type_name.h"
 #include <iostream>
 
 namespace ecs {
@@ -77,15 +77,12 @@ namespace ecs {
 
 
 	namespace traits { 
-		DECL_GET_ATTRIB_TYPE(pool, ecs::archetype<T>)
-
-		template<typename LHS_T, typename RHS_T>
-		struct same_pool : std::is_same<get_pool_t<std::remove_const_t<LHS_T>>, get_pool_t<std::remove_const_t<RHS_T>>> { };
+		DECL_GET_ATTRIB_TYPE(pool, ecs::archetype<std::remove_const_t<T>>) // gets T::pool, defaults to archetype<T>
 	}
 
 
 	template<typename T>
-	using pool = traits::get_pool_t<std::remove_const_t<T>>;
+	using pool = traits::get_pool_t<T>;
 }
 
 #endif

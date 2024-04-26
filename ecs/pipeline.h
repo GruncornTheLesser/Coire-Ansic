@@ -14,11 +14,13 @@ namespace ecs {
 	template<typename ... Ts>
 	struct pipeline_t {
 		using resource_container_set = std::tuple<Ts...>;
-		using pipeline_set = 
-			util::tuple_for_each_t<std::add_pointer, 								// add pointer
-			util::tuple_union_t<util::cmp<std::is_same, std::remove_const>::type, 	// erase repeats
-			util::tuple_for_each_t<traits::get_resource_container, resource_container_set>>>;// get resource containers
-
+		using pipeline_set = util::trn::set_t<std::tuple<Ts...>, 
+			util::trn::build::each<traits::get_resource_container>::template type,
+			util::trn::build::wrap<std::tuple>::template type,
+			util::trn::build::concat::template type,
+			util::trn::build::unique<util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type,
+			util::trn::build::each<std::add_pointer>::template type
+			>;
 		template<typename base_T>
 		pipeline_t(base_T& base);
 

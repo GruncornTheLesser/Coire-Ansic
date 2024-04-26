@@ -41,10 +41,10 @@ pool:
 // alternatively I could keep it simple and just declare a mirror set of functions in the pipeline.
 // this would be repated again in registry. suddenly becomes all a bit grim...
 
-//#include "ecs/registry.h"
-//#include "ecs/pipeline.h"
-//#include "ecs/view.h"
-//#include "ecs/pool.h"
+#include "ecs/registry.h"
+#include "ecs/pipeline.h"
+#include "ecs/view.h"
+#include "ecs/pool.h"
 
 struct A;
 struct B;
@@ -57,7 +57,6 @@ struct D { };
 struct E { };
 
 //static_assert(ecs::pipeline<ecs::pool<A>>::is_accessible<ecs::pool<A>::entity>, "");
-#include "ecs/util/tuple_util2.h"
 #include "ecs/util/type_name.h"
 #include <vector>
 #include <iostream>
@@ -65,75 +64,10 @@ template<typename T> struct get_resource_set { using type = std::tuple<int, cons
 template<typename T> struct is_resource : std::is_const<T> { };
 template<typename T> struct get_pool { using type = std::array<T, 1>; };
 
-using namespace util;
-
-template<typename Tup>
-using gfd = typename trn::each<
-			Tup, // for each, get resource set and transform
-			trn::build::post_conditional<
-				trn::build::set<
-					get_resource_set, // get required types for each requested resource 
-					trn::build::each< // for each if requested that isn't resource, get pool of required type. assumes component
-						trn::build::conditional<mtc::build::negate<is_resource>::template type, get_pool>::template type
-					>::template type
-				>::template type, 
-				std::is_const, // if const
-				trn::build::each<std::add_const>::template type // add const
-			>::template type
-		>::type;
-
-using fdgfdg = gfd<std::tuple<C>>;
-
-
-template<typename Tup>
-using y = trn::set_t<Tup,
-	trn::build::each< // for each requested type
-		trn::build::post_conditional<
-			trn::build::set<get_resource_set, trn::build::each<trn::build::conditional<
-				mtc::build::negate<is_resource>::template type, get_pool // if not resource, get component pool
-				>::template type>::template type>::template type,
-			std::is_const, trn::build::each<std::add_const>::template type 
-		>::template type
-	>::template type,
-	trn::build::concat::template type, // concat requested types together
-	trn::build::sort<alpha_lt>::template type, // sort types by name
-	trn::build::sort<cmp::build::prioritize_if<std::is_const>::template type>::template type, // sort types by name
-	trn::build::unique<cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type
-	>;
-
-using fdsfds = util::trn::sort_t<std::tuple<C, const A, B, A>, cmp::build::negate<alpha_lt>::template type>;
-
 int main() {
-	std::cout << util::type_name<y<std::tuple<C, A>>>() << std::endl;
-
-	//using guhgd = std::tuple<ecs::pool<A>::index>;
-	/*using fdsfds = 
-		tuple_for_each_if_else_t<std::is_const, 
-			util::type_transform< // if const
-				ecs::traits::get_resource_set, 
-				util::transform_each<
-					util::transform_if_not<
-						ecs::traits::is_resource, 
-						ecs::traits::get_pool
-					>::type,
-					std::add_const
-				>::type // propergate const to resources
-			>::type,
-			util::type_transform< // else not const
-				ecs::traits::get_resource_set,
-				util::transform_each<
-					util::transform_if_not<
-						ecs::traits::is_resource, 
-						ecs::traits::get_pool
-					>::type
-				>::type
-			>::type,
-		guhgd>;*/
-/*
-	std::cout << util::type_name<fdsfds>() << std::endl;
-
 	ecs::registry reg;
-
+	std::cout << util::type_name<ecs::pipeline_builder<const ecs::pool<int>, float>::type>() << std::endl;
+	/*
 	{
 		auto pip = reg.pipeline<ecs::pool<int>, ecs::pool<float>, ecs::pool<char>>();
 		std::lock_guard guard(pip);
@@ -165,9 +99,7 @@ int main() {
 
 	//auto view = reg.view<ecs::entity, A, B>(ecs::from<C>{}, ecs::where<ecs::include<A, B>>{});
 	//auto& [e, a, b] = *view.begin();
-*/
-
-
+	*/
 }
 
 /*

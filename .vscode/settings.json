@@ -17,7 +17,6 @@
 		"cctype": "cpp",
 		"clocale": "cpp",
 		"cmath": "cpp",
-		"compare": "cpp",
 		"concepts": "cpp",
 		"condition_variable": "cpp",
 		"cstddef": "cpp",
@@ -84,7 +83,8 @@
 		"valarray": "cpp",
 		"chrono": "cpp",
 		"type_traits": "cpp",
-		"*.tpp": "cpp"
+		"*.tpp": "cpp",
+		"compare": "cpp"
 	},
 	//"C_Cpp.default.compilerPath": "C:\\Program Files (x86)\\MSYS\\mingw64\\bin\\g++.exe",
 }

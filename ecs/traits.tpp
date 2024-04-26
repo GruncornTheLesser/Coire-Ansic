@@ -18,10 +18,14 @@ namespace ecs::traits {
 		decltype(std::declval<T>().template get<Ts>())...>> : std::true_type { };
 
 	template<typename T, typename Pip_T> struct is_pipeline_accessible : 
-		util::is_subset<util::cmp_disjunction< // match const with const, mut with const or mut
-		util::cmp_transform_rhs<std::is_same, std::remove_const>::type, 
-		util::cmp_transform_rhs<std::is_same, std::add_const>::type>::type,
-		traits::get_resource_set_t<T>, Pip_T> { };
+		util::mtc::build::allof<
+			util::mtc::build::element_of<Pip_T,
+				util::cmp::build::disjunction<
+					util::cmp::build::transformed_rhs<std::is_same, std::add_const>::template type,
+					util::cmp::build::transformed_rhs<std::is_same, std::add_const>::template type
+				>::template type
+			>::template type
+		>::type<ecs::traits::get_resource_set_t<T>> { };
 
 }
 

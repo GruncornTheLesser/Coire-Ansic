@@ -20,7 +20,7 @@
 	template <typename T> struct get_##NAME<T, std::enable_if_t<!has_##NAME##_v<T>>> { using type = std::tuple<std::remove_cvref_t<T>>; };\
 	template <typename T> struct get_##NAME<T, std::enable_if_t<has_##NAME##_v<T>>> { using type = typename get_##NAME<typename T::NAME>::type; };\
 	template<typename ... Ts> struct get_##NAME<std::tuple<Ts...>, std::enable_if_t<!has_##NAME##_v<std::tuple<Ts...>>>>\
-	{ using type = util::tuple_concat_t<typename get_##NAME<Ts>::type...>; };\
+	{ using type = util::trn::concat_t<util::trn::each_t<std::tuple<Ts...>, get_##NAME>>; };\
 	template<typename T> using get_##NAME##_t = typename get_##NAME<T>::type;
 
 #define DECL_HAS_ATTRIB_VALUE(NAME, ATTRIB)\
