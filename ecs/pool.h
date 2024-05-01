@@ -19,17 +19,20 @@ namespace ecs {
 		mutable std::shared_mutex mtx;
 	};
 	
+	// TODO: remove nested resources in archetype and instead infer container from component???
+	// TODO: maybe. combine component and index resources?????
+	// index is the most useless resource, can be used for contains and index lookups. 
+	// operation:
+	//		immediate emplace/erase -> index, entity, comp
+	//		deferred emplace/erase -> entity
+	// 		swap -> index
+	//		iterate -> entity, comp 
+	//		retrieve -> index, comp
+	// TODO: traits class -> with default values etc
+
 	template<typename ... Ts>
 	struct archetype {
-		// TODO: maybe. combine component and index resources?????
-		// index is the most useless resource, can be used for contains and index lookups. 
-		// operation:
-		//		immediate emplace/erase -> index, entity, comp
-		//		deferred emplace/erase -> entity
-		// 		swap -> index
-		//		iterate -> entity, comp 
-		//		retrieve -> index, comp
-
+		
 		// resource attributes
 		template<typename U>
 		struct comp : public resource, util::paged_block<U> {
@@ -49,9 +52,14 @@ namespace ecs {
 			size_t n = 0;
 		};
 
+		// the set of resources associated with this contianer
 		using resource_set = std::tuple<comp<Ts>..., index, entity>;
-		using synchronization_set = std::tuple<comp<Ts>..., index, entity>; 
-		using pool = archetype<Ts...>; // get pool<archetype<U>>() -> archetype<U>&
+
+		// the set of resources that are requested when sync is called on this resource container object
+		using synchronization_set = std::tuple<comp<Ts>..., index, entity>;
+
+		// is a pool of itself in case get_pool<pool<Ts...>> is called;
+		using pool = archetype<Ts...>; 
 		
 		template<typename U>
 		U& get_resource() {
@@ -60,7 +68,9 @@ namespace ecs {
 
 		template<typename ... Us>
 		void sync() {
-			((std::cout << "syncing: " << util::type_name<Us>() << std::endl), ...);
+			std::cout << "syncing container: " << util::type_name<archetype<Ts...>>() << " = {";
+			((std::cout << std::string(util::type_name<Us>()).substr(util::type_name<archetype<Ts...>>().size()) << ", "  ), ...);
+			std::cout << "\b\b}" << std::endl;
 			// TODO: finish me
 			// NOTE: can deadlock if needs to acquire new resource oopsies
 			// deferred -> 
@@ -68,23 +78,24 @@ namespace ecs {
 			
 			// iterate through entity update list
 			// swap component at index 1 with component at index of entity at index 1
-			//  
 		}
 	private:
 		resource_set data;
 	};
 
-
-
 	namespace traits { 
 		DECL_GET_ATTRIB_TYPE(pool, ecs::archetype<std::remove_const_t<T>>) // gets T::pool, defaults to archetype<T>
+
+		template<typename T> struct get_pool_index_storage { using type = typename get_pool_t<T>::index; };
+		template<typename T> using get_pool_index_storage_t = get_pool_index_storage<T>;
+		template<typename T> struct get_pool_entity_storage { using type = typename get_pool_t<T>::entity; };
+		template<typename T> using get_pool_entity_storage_t = get_pool_entity_storage<T>;
+		template<typename T> struct get_pool_component_storage { using type = typename get_pool_t<T>::template comp<T>; };
+		template<typename T> using get_pool_component_storage_t = get_pool_component_storage<T>;
 	}
-
-
 	template<typename T>
-	using pool = traits::get_pool_t<T>;
+	using pool = util::trn::propergate_const_t<T, traits::get_pool>;
 }
-
 #endif
 
 

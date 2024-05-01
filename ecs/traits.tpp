@@ -19,14 +19,14 @@ namespace ecs::traits {
 
 	template<typename T, typename Pip_T> struct is_pipeline_accessible : 
 		util::mtc::build::allof<
-			util::mtc::build::element_of<Pip_T,
+			util::mtc::build::element_of<
+				typename Pip_T::resource_set,
 				util::cmp::build::disjunction<
-					util::cmp::build::transformed_rhs<std::is_same, std::add_const>::template type,
+					std::is_same, 
 					util::cmp::build::transformed_rhs<std::is_same, std::add_const>::template type
 				>::template type
 			>::template type
-		>::type<ecs::traits::get_resource_set_t<T>> { };
-
+		>::template type<util::trn::propergate_const_each_t<T, ecs::traits::get_resource_set>> { };
 }
 
 #endif

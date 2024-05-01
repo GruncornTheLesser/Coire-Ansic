@@ -8,12 +8,12 @@
 #include "traits.h"
 #include "policy.h"
 
-// TODO: isolate template members eg resource set to traits class -> allow for defaulting for eg component 
-
 namespace ecs {
 	template<typename ... Ts>
 	struct pipeline_t {
-		using resource_container_set = std::tuple<Ts...>;
+		// the set of resources locked by this pipeline
+		using resource_set = std::tuple<Ts...>;
+		// the set of pointers to containers required for all resource set  
 		using pipeline_set = util::trn::set_t<std::tuple<Ts...>, 
 			util::trn::build::each<traits::get_resource_container>::template type,
 			util::trn::build::wrap<std::tuple>::template type,
@@ -21,6 +21,7 @@ namespace ecs {
 			util::trn::build::unique<util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type,
 			util::trn::build::each<std::add_pointer>::template type
 			>;
+
 		template<typename base_T>
 		pipeline_t(base_T& base);
 
@@ -40,21 +41,12 @@ namespace ecs {
 		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename ... Arg_Us> 
 			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>) && 
 			std::is_constructible_v<U, Arg_Us...>
-		U& emplace(ecs::entity e, Arg_Us&& ... args);
+		Policy_U<U>::emplace_return emplace(ecs::entity e, Arg_Us&& ... args);
 		
 		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename It, typename ... Arg_Us> 
 			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>) && 
 			std::is_constructible_v<U, Arg_Us...>
-		U& emplace(It first, It last, Arg_Us&& ... args);
-
-		template<typename U, typename Policy_U, typename ... Arg_Us> 
-			requires (traits::is_pipeline_accessible_v<Policy_U, pipeline_t<Ts...>>) && 
-			std::is_constructible_v<U, Arg_Us...>
-		U& emplace(Policy_U pol, ecs::entity e, Arg_Us&& ... args);
-		
-		template<typename U, typename Policy_U, typename It, typename ... Arg_Us>
-			requires (traits::is_pipeline_accessible_v<Policy_U, pipeline_t<Ts...>>)
-		U& emplace(Policy_U pol, It first, It last, Arg_Us&& ... args);
+		Policy_U<U>::emplace_return emplace(It first, It last, Arg_Us&& ... args);
 
 		template<typename U, template<typename> typename Policy_U = deferred> 
 			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>)

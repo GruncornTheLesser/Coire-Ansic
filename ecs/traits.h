@@ -23,20 +23,15 @@
 	{ using type = util::trn::concat_t<util::trn::each_t<std::tuple<Ts...>, get_##NAME>>; };\
 	template<typename T> using get_##NAME##_t = typename get_##NAME<T>::type;
 
-#define DECL_HAS_ATTRIB_VALUE(NAME, ATTRIB)\
+#define DECL_HAS_ATTRIB_VALUE(NAME)\
 	template<typename T, typename=std::void_t<>> struct has_##NAME : std::false_type { };\
-	template<typename T> struct has_##NAME<T, std::void_t<decltype(std::declval<T>().ATTRIB)>> : std::true_type { };\
+	template<typename T> struct has_##NAME<T, std::void_t<decltype(T::NAME)>> : std::true_type { };\
 	template<typename T> static constexpr bool has_##NAME##_v = has_##NAME<T>::value;
 
-#define DECL_HAS_STATIC_ATTRIB_VALUE(NAME)\
-	template<typename T, typename=std::void_t<>> struct has_##NAME : std::false_type { };\
-	template<typename T> struct has_##NAME<T, std::void_t<decltype(T::##NAME)>> : std::true_type { };\
-	template<typename T> static constexpr bool has_##NAME##_v = has_##NAME<T>::value;
-
-#define DECL_GET_STATIC_ATTRIB_VALUE(NAME, DEFAULT)\
-	template<typename T, typename=std::void_t<>> struct get_##NAME : std::false_type { };\
-	template<typename T> struct get_##NAME<T, std::void_t<decltype(T::##NAME)>> : std::true_type { };\
-	template<typename T> static constexpr bool has_##NAME##_v = has_##NAME<T>::value;
+#define DECL_GET_ATTRIB_VALUE(NAME, TYPE, DEFAULT)\
+	template<typename T, typename=std::void_t<>> struct get_##NAME { static constexpr TYPE value = DEFAULT; };\
+	template<typename T> struct get_##NAME<T, std::void_t<decltype(T::NAME)>> { static constexpr TYPE value = T::NAME; };\
+	template<typename T> static constexpr TYPE get_##NAME##_v = get_##NAME<T>::value;
 
 namespace ecs::traits {
 	DECL_HAS_ATTRIB_TYPE(resource_container)
@@ -48,6 +43,9 @@ namespace ecs::traits {
 	DECL_HAS_ATTRIB_TYPE(synchronization_set)
 	DECL_GET_ATTRIB_TYPE(synchronization_set, std::tuple<>)
 	
+	DECL_HAS_ATTRIB_VALUE(lock_priority)
+	DECL_GET_ATTRIB_VALUE(lock_priority, float, 0.5f)
+
 	template<typename T, typename=std::void_t<>> struct is_resource;
 	template<typename T, typename resource_set_T, typename=std::void_t<>> struct is_storage;
 	template<typename T, typename resource_set_T> struct is_acquirable;

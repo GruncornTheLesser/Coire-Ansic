@@ -194,6 +194,7 @@ namespace util {
 		paged_block_iterator(size_t index, T** pages) : index(index), pages(pages) { }
 		
 		T& operator*() { return pages[index / paged_block<T>::page_size][index % paged_block<T>::page_size]; }
+		T* operator->() { return this->operator*(); }
 		
 		paged_block_iterator<T> operator++() { ++index; return *this; }
 		paged_block_iterator<T> operator++(int) { paged_block_iterator<T> temp = *this; ++index; return temp; }
@@ -235,16 +236,13 @@ namespace util {
 
 		iterator begin() { return { data }; }
 		iterator end() { return { data + cap }; }
-		const_iterator begin() const { return iterator{ data }; }
-		const_iterator end() const { return iterator{ data + cap }; }
+		const_iterator begin() const { return { data }; }
+		const_iterator end() const { return { data + cap }; }
 		
 		reverse_iterator rbegin() { return iterator{ data + cap }; }
 		reverse_iterator rend() { return iterator{ data - 1 }; }
-		const_reverse_iterator rbegin() const { return iterator{ data + cap - 1 }; }
-		const_reverse_iterator rend() const { return iterator{ data - 1 }; }
-		
-		const_reverse_iterator crbegin() const { return iterator{ data + cap - 1 }; }
-		const_reverse_iterator crend() const { return iterator{ data - 1 }; }
+		const_reverse_iterator rbegin() const { return const_iterator { data + cap - 1 }; }
+		const_reverse_iterator rend() const { return const_iterator { data - 1 }; }
 		
 		reference operator[](size_t index) { return data[index]; }
 		const_reference operator[](size_t index) const { return data[index]; }
@@ -273,6 +271,7 @@ namespace util {
 		unpaged_block_iterator(T* ptr) : ptr(ptr) { }
 
 		T& operator*() { return *ptr; }
+		T* operator->() { return ptr; }
 		
 		unpaged_block_iterator<T> operator++() { ++ptr; return *this; }
 		unpaged_block_iterator<T> operator++(int) { unpaged_block_iterator<T> temp = *this; ++ptr; return temp; }

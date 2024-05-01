@@ -16,6 +16,8 @@ namespace ecs {
 	template<typename ... Ts> 
 	struct exclude;
 
+	// TODO: move view_builders to traits
+
 	template<typename select_T>
 	struct view_from_builder;
 	template<typename select_T>
@@ -59,19 +61,21 @@ namespace ecs {
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
+		using resource_set = std::tuple<select_T, from_T, where_T>;
+
 		view(pip_T&& base);
 
-		iterator begin();
-		iterator end();
+		reverse_iterator begin();
+		reverse_iterator end();
 
-		const_iterator begin() const;
-		const_iterator end() const;
+		const_reverse_iterator begin() const;
+		const_reverse_iterator end() const;
 		
-		reverse_iterator rbegin();
-		reverse_iterator rend();
+		iterator rbegin();
+		iterator rend();
 
-		const_reverse_iterator rbegin() const;
-		const_reverse_iterator rend() const;
+		const_iterator rbegin() const;
+		const_iterator rend() const;
 	private:
 		pip_storage pip;
 	};
@@ -79,7 +83,7 @@ namespace ecs {
 	template<typename select_T, typename from_T, typename where_T, typename pip_T>
 	class view_iterator {
 	public:
-		using reference = view_reference<select_T, from<from_T>, pip_T>;
+		using reference = view_reference<select_T, from_T, pip_T>;
 		using const_reference = view_reference<util::trn::each_t<select_T, std::add_const>, from_T, pip_T>;
 		
 		view_iterator(pip_T& pip, size_t index);
