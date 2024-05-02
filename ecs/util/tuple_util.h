@@ -7,8 +7,9 @@
 #define TEMPLATE template<typename...> typename
 
 // TODO: add easy pre transform to compare and match operations???
+// TODO: naming convention for match, add is to front
 
-// [X] concat
+// [ ] concat
 namespace util::trn {
 	/// @brief concatenates each tuple in input tuples together
 	/// @tparam Tups the input tuple
@@ -27,7 +28,7 @@ namespace util::trn::build {
 	struct concat { template<typename Tup> using type = util::trn::concat<Tup>; };
 }
 
-// [X] set
+// [ ] set
 namespace util::trn {
 	/// @brief evaluates Transforms from left to right on type argument passed to type<T>
 	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
@@ -48,14 +49,23 @@ namespace util::trn::build {
 	struct set { template<typename T> using type = util::trn::set<T, Trans_Ts...>; };
 }
 
-// [X] negate match
+// [ ] negate match
 namespace util::mtc::build {
 	/// @brief returns true if not matched
 	/// @tparam Match_T a template taking 1 argument with a static constexpr boolean value, eg std::is_const
-	template<MATCH Match_T> struct negate { template<typename T> using type = std::negation<Match_T<T>>; };
+	template<MATCH Match_T> struct negation { template<typename T> using type = std::negation<Match_T<T>>; };
 }
 
-// [X] conditional
+// [ ] negate compare
+namespace util::cmp::build {
+	/// @brief negates a compare predicate
+	/// @tparam Cmp_T compare operation
+	template<COMPARE Cmp_T> struct negate { 
+		template<typename LHS_T, typename RHS_T> using type = std::negation<Cmp_T<LHS_T, RHS_T>>; };
+}
+
+
+// [ ] conditional
 namespace util::trn {
 	/// @brief if Match evaulates to true, evaluates transforms left to right
 	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
@@ -73,12 +83,12 @@ namespace util::trn::build {
 	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
 	template<MATCH Match_T, TRANSFORM If_T, TRANSFORM Else_T = std::type_identity> struct conditional { 
 		template<typename T> using type = trn::conditional<T, Match_T, If_T, Else_T>; 
-		template<typename T> using negated = trn::conditional<T, mtc::build::negate<Match_T>::template type, If_T, Else_T>;
+		template<typename T> using negated = trn::conditional<T, mtc::build::negation<Match_T>::template type, If_T, Else_T>;
 	};
 
 }
 
-// [X] each
+// [ ] each
 namespace util::trn {
 	/// @brief transform each type in Tup passed
 	/// @tparam Trans_Ts  a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const 
@@ -98,7 +108,7 @@ namespace util::trn::build {
 	template<TRANSFORM Trans_T> struct each { template<typename Tup> using type = util::trn::each<Tup, Trans_T>; };
 }
 
-// [X] filter
+// [ ] filter
 namespace util::trn {
 	/// @brief filters tuple for types that match
 	/// @tparam Match_T a template taking 1 argument with a static constexpr boolean value, eg std::is_const
@@ -116,19 +126,16 @@ namespace util::trn::build {
 	template<MATCH Match_T> struct filter { template<typename Tup> using type = util::trn::filter<Tup, Match_T>; };
 }
 
-// [X] compare to
+// [ ] compare to
+// TODO: swap/explicity say LHS RHS in compare_to operation
 namespace util::mtc::build {
-	/// @brief constructs a match template predicate from a compare template predicate
-	/// @tparam Cmp_T a template predicate taking 2 typename args, with member bool "value", eg std::is_same
-	/// @tparam LHS_T eg int
-	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
-	template<COMPARE Cmp_T, typename LHS_T> struct compare_to { 
+	template<typename LHS_T, COMPARE Cmp_T> struct compare_to { 
 		template<typename RHS_T> using type = Cmp_T<LHS_T, RHS_T>; 
-		template<typename RHS_T> using negated = std::negation<Cmp_T<LHS_T, RHS_T>>; 
+		template<typename RHS_T> using negated = std::negation<type<RHS_T>>; 
 	};
 }
 
-// [X] sort
+// [ ] sort
 namespace util::trn {
 	/// @brief sorts tuple by Cmp_T func.
 	/// @tparam Cmp_T a template predicate taking 2 typename args, with member bool "value", eg std::is_same
@@ -138,8 +145,8 @@ namespace util::trn {
 
 	template<TEMPLATE Tup, typename T, typename ... Ts, COMPARE Cmp_T>
 	struct sort<Tup<T, Ts...>, Cmp_T> : util::trn::concat<std::tuple<
-		sort_t<filter_t<Tup<Ts...>, mtc::build::compare_to<Cmp_T, T>::template negated>, Cmp_T>, Tup<T>, // not less than
-		sort_t<filter_t<Tup<Ts...>, mtc::build::compare_to<Cmp_T, T>::template type>, Cmp_T>>> // less than
+		sort_t<filter_t<Tup<Ts...>, mtc::build::compare_to<T, Cmp_T>::template negated>, Cmp_T>, Tup<T>, // not less than
+		sort_t<filter_t<Tup<Ts...>, mtc::build::compare_to<T, Cmp_T>::template type>, Cmp_T>>> // less than
 	{ };
 	
 	template<TEMPLATE Tup, COMPARE Cmp_T>
@@ -153,7 +160,7 @@ namespace util::trn::build {
 	/// @tparam ::type<Tup> the input tuple
 	template<COMPARE LT_T> struct sort { template<typename Tup> using type = util::trn::sort<Tup, LT_T>; }; 
 }
-// [X] 
+// [ ] 
 namespace util::trn {
 	template<typename Tup, COMPARE Same_T>
 	struct unique;
@@ -164,7 +171,7 @@ namespace util::trn {
 
 	template<TEMPLATE Tup, typename T, typename ... Ts, COMPARE Same_T>
 	struct unique<Tup<T, Ts...>, Same_T> : 
-		concat<std::tuple<Tup<T>, unique_t<filter_t<std::tuple<Ts...>, mtc::build::compare_to<Same_T, T>::template negated>, Same_T>>>
+		concat<std::tuple<Tup<T>, unique_t<filter_t<std::tuple<Ts...>, mtc::build::compare_to<T, Same_T>::template negated>, Same_T>>>
 	{ };
 
 	template<TEMPLATE Tup, COMPARE Same_T>
@@ -175,7 +182,7 @@ namespace util::trn::build {
 	struct unique { template<typename Tup> using type = trn::unique<Tup, Same_T>; };
 }
 
-// [X] set_union
+// [ ] set_union
 namespace util::trn {
 	/// @brief performs a union set operation on the Tups passed. removes duplicates.
 	/// @tparam Cmp_T a template predicate taking 2 typename args, with member bool "value", eg std::is_same
@@ -193,7 +200,7 @@ namespace util::trn::build {
 	template<typename Set_T, COMPARE Same_T = std::is_same> struct set_union { template<typename Tup> using type = util::trn::set_union<Tup, Set_T, Same_T>;  };
 }
 
-// [X] rewrap
+// [ ] rewrap
 namespace util::trn {
 	/// @brief unwraps template and wraps in new template 
 	template<typename T, TEMPLATE Tup> struct rewrap;
@@ -205,7 +212,7 @@ namespace util::trn::build {
 	template<TEMPLATE Tup> struct rewrap { template<typename T> using type = util::trn::rewrap<T, Tup>; };
 }
 
-// [X] wrap
+// [ ] wrap
 namespace util::trn {
 	/// @brief wraps passed arg in Tup
 	template<typename T, TEMPLATE Tup> struct wrap { using type = Tup<T>; };
@@ -216,71 +223,104 @@ namespace util::trn::build {
 	template<TEMPLATE Tup> struct wrap { template<typename T> using type = util::trn::wrap<T, Tup>; };
 }
 
-// [X] match disjunction
+// [ ] match disjunction
 namespace util::mtc::build {
 	template<MATCH ... Match_Ts>
 	struct disjunction { 
 		template<typename T> using type = std::disjunction<Match_Ts<T>...>; 
-		template<typename T> using negated = std::negation<std::disjunction<Match_Ts<T>...>>;
+		template<typename T> using negated = std::negation<type<T>>;
 	};
 }
-// [X] match conjunction
+
+// [ ] match conjunction
 namespace util::mtc::build {
 	template<MATCH ... Match_Ts>
 	struct conjunction { 
 		template<typename T> using type = std::conjunction<Match_Ts<T>...>; 
-		template<typename T> using negated = std::negation<std::conjunction<Match_Ts<T>...>>;
+		template<typename T> using negated = std::negation<type<T>>;
 	};
 }
 
-// [X] compare disjunction
+// [ ] compare disjunction
 namespace util::cmp::build {
 	template<COMPARE ... Cmp_Ts>
-	struct disjunction { template<typename LHS_T, typename RHS_T> using type = std::disjunction<Cmp_Ts<LHS_T, RHS_T>...>; };
-}
-// [X] compare conjunction
-namespace util::cmp::build {
-	template<COMPARE ... Cmp_Ts>
-	struct conjunction  { template<typename LHS_T, typename RHS_T> using type = std::conjunction<Cmp_Ts<LHS_T, RHS_T>...>; };
+	struct disjunction { 
+		template<typename LHS_T, typename RHS_T> using type = std::disjunction<Cmp_Ts<LHS_T, RHS_T>...>;
+		template<typename LHS_T, typename RHS_T> using negated = std::negation<type<LHS_T, RHS_T>>; 
+	};
 }
 
-// [X] all of
+// [ ] compare conjunction
+namespace util::cmp::build {
+	template<COMPARE ... Cmp_Ts>
+	struct conjunction  { 
+		template<typename LHS_T, typename RHS_T> using type = std::conjunction<Cmp_Ts<LHS_T, RHS_T>...>; 
+		template<typename LHS_T, typename RHS_T> using negated = std::negation<type<LHS_T, RHS_T>>;
+	};
+}
+
+// [ ] all of
+namespace util::mtc {
+	/// @brief returns true if any of types in tuple match
+	/// @tparam Match_T a template taking 1 argument with a static constexpr boolean value, eg std::is_const
+	template<typename Tup, MATCH Match_T> struct allof : util::trn::set_t<Tup,
+		trn::build::each<trn::build::wrap<Match_T>::template type>::template type,
+		trn::build::rewrap<std::conjunction>::template type> { };
+	template<typename Tup, MATCH Match_T> static constexpr bool allof_v = allof<Tup, Match_T>::value;
+}
 namespace util::mtc::build {
 	/// @brief returns true if any of types in tuple match
 	/// @tparam Match_T a template taking 1 argument with a static constexpr boolean value, eg std::is_const
-	template<MATCH Match_T> struct allof { template<typename Tup> using type = util::trn::set_t<Tup,
-		trn::build::each<trn::build::wrap<Match_T>::template type>::template type,
-		trn::build::rewrap<std::conjunction>::template type>; };
+	template<MATCH Match_T> struct allof { template<typename Tup> using type = mtc::allof<Tup, Match_T>; };
 }
 
-// [X] any of
+static_assert(util::mtc::allof_v<std::tuple<const int, const float>, std::is_const>, "");
+static_assert(!util::mtc::allof_v<std::tuple<const int, float>, std::is_const>, "");
+
+// [ ] any of
+namespace util::mtc {
+	template<typename Tup, MATCH Match_T> struct anyof : util::trn::set_t<Tup,
+			trn::build::each<trn::build::wrap<Match_T>::template type>::template type,
+			trn::build::rewrap<std::disjunction>::template type> { }; 
+	template<typename Tup, MATCH Match_T> static constexpr bool anyof_v = anyof<Tup, Match_T>::value;
+}
 namespace util::mtc::build {
 	/// @brief returns true if all of types in tuple return true in match
 	/// @tparam Match_T a template taking 1 argument with a static constexpr boolean value, eg std::is_const
 	template<MATCH Match_T> struct anyof { 
-		template<typename Tup> using type = util::trn::set_t<Tup,
-			trn::build::each<trn::build::wrap<Match_T>::template type>::template type,
-			trn::build::rewrap<std::disjunction>::template type>;
+		template<typename Tup> using type = mtc::anyof<Tup, Match_T>;
 	};
 }
 
+static_assert(!util::mtc::anyof_v<std::tuple<int, float>, std::is_const>, "");
+static_assert(util::mtc::anyof_v<std::tuple<const int, float>, std::is_const>, "");
 
-// [X] element of/contains
+
+// [ ] element of/contains
+namespace util::mtc {
+	template<typename T, typename Tup, COMPARE Cmp_T = std::is_same>
+	struct element_of : anyof<Tup, build::compare_to<T, Cmp_T>::template type> { };
+	template<typename T, typename Tup, COMPARE Cmp_T = std::is_same>
+	static constexpr bool element_of_v = element_of<T, Tup, Cmp_T>::value;
+}
 namespace util::mtc::build {
 	template<typename Tup, COMPARE Cmp_T = std::is_same>
 	struct element_of { 
-		template<typename T> using type = anyof<compare_to<Cmp_T, T>::template type>::template type<Tup>; 
-		template<typename T> using negated = std::negation<typename anyof<compare_to<Cmp_T, T>::template type>::template type<Tup>>; 
+		template<typename T> using type = mtc::element_of<T, Tup, Cmp_T>; 
+		template<typename T> using negated = std::negation<type<T>>;
 	};
 
 	template<typename T, COMPARE Cmp_T = std::is_same>
 	struct contains { 
-		template<typename Tup> using type = anyof<compare_to<Cmp_T, T>::template type>::template type<Tup>; 
-		template<typename Tup> using negated = std::negation<typename anyof<compare_to<Cmp_T, T>::template type>::template type<Tup>>;
+		template<typename Tup> using type = mtc::element_of<T, Tup>; 
+		template<typename Tup> using negated = std::negation<type<Tup>>;
 	};
 }
 
-// [X] set_intersect
+static_assert(util::mtc::element_of_v<int, std::tuple<float, int>>, "");
+static_assert(!util::mtc::element_of_v<int, std::tuple<float, char>>, "");
+
+// [ ] set_intersect
 namespace util::trn {
 	/// @brief performs a intersect set operation on the 
 	/// @tparam Cmp_T a template predicate taking 2 typename args, with member bool "value", eg std::is_same
@@ -300,7 +340,7 @@ namespace util::trn::build {
 	template<COMPARE Same_T, typename Set_T> struct set_intersect { template<typename Tup> using type = util::trn::set_intersect<Tup, Set_T, Same_T>; };
 }
 
-// [X] assign
+// [ ] assign
 namespace util::trn::build {
 	/// @brief transforms type to new type 
 	/// @tparam Cmp_T a template predicate taking 2 typename args, with member bool "value", eg std::is_same
@@ -308,97 +348,95 @@ namespace util::trn::build {
 	template<typename New_T> struct assign { template<typename T> using type = std::type_identity<New_T>; };
  }
 
-// [X] negate compare
-namespace util::cmp::build {
-	/// @brief negates a compare predicate
-	/// @tparam Cmp_T compare operation
-	template<COMPARE Cmp_T> struct negate { 
-		template<typename LHS_T, typename RHS_T> using type = std::negation<Cmp_T<LHS_T, RHS_T>>; };
-}
 
-// [X] compare transformed
+// [ ] compare transformed
+namespace util::cmp {
+	/// @brief transforms types before comparing them.
+	/// @tparam Cmp_T a template predicate taking 2 typename args, with member bool "value", eg std::is_same
+	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM Trans_T> 
+	struct transformed : Cmp_T<typename Trans_T<LHS_T>::type, typename Trans_T<RHS_T>::type> { };
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM Trans_T>
+	static constexpr bool transformed_v = transformed<LHS_T, RHS_T, Cmp_T, Trans_T>::value;
+	
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM LHS_Trans_T, TRANSFORM RHS_Trans_T> 
+	struct transformed_individual : Cmp_T<typename LHS_Trans_T<LHS_T>::type, typename RHS_Trans_T<RHS_T>::type> { };
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM LHS_Trans_T, TRANSFORM RHS_Trans_T> 
+	static constexpr bool transformed_individual_v = transformed_individual<LHS_T, RHS_T, Cmp_T, LHS_Trans_T, RHS_Trans_T>::value;
+	
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM RHS_Trans_T> 
+	struct transformed_rhs : transformed_individual<LHS_T, RHS_T, Cmp_T, std::type_identity, RHS_Trans_T> { };
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM RHS_Trans_T>
+	static constexpr bool transformed_rhs_v = transformed_rhs<LHS_T, RHS_T, Cmp_T, RHS_Trans_T>::value;
+	
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM LHS_Trans_T> 
+	struct transformed_lhs : transformed_individual<LHS_T, RHS_T, Cmp_T, LHS_Trans_T, std::type_identity> { };
+	template<typename LHS_T, typename RHS_T, COMPARE Cmp_T, TRANSFORM LHS_Trans_T> 
+	static constexpr bool transformed_lhs_v = transformed_lhs<LHS_T, RHS_T, Cmp_T, LHS_Trans_T>::value;
+	
+}
 namespace util::cmp::build {
 	/// @brief transforms types before comparing them.
 	/// @tparam Cmp_T a template predicate taking 2 typename args, with member bool "value", eg std::is_same
 	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
-	template<COMPARE Cmp_T, TRANSFORM Trans_T = std::type_identity> struct transformed { 
-		template<typename LHS_T, typename RHS_T> using type = Cmp_T<typename Trans_T<LHS_T>::type, typename Trans_T<RHS_T>::type>;
-		template<typename LHS_T, typename RHS_T> using negated = std::negation<Cmp_T<typename Trans_T<LHS_T>::type, typename Trans_T<RHS_T>::type>>;
+	template<COMPARE Cmp_T, TRANSFORM Trans_T> struct transformed { 
+		template<typename LHS_T, typename RHS_T> using type = cmp::transformed<LHS_T, RHS_T, Cmp_T, Trans_T>;
+		template<typename LHS_T, typename RHS_T> using negated = std::negation<type<LHS_T, RHS_T>>;
 	};
 
-	template<COMPARE Cmp_T, TRANSFORM LHS_Trans_T = std::type_identity, TRANSFORM RHS_Trans_T = std::type_identity> struct transformed_individual { 
-		template<typename LHS_T, typename RHS_T> using type = Cmp_T<typename LHS_Trans_T<LHS_T>::type, typename RHS_Trans_T<RHS_T>::type>;
-		template<typename LHS_T, typename RHS_T> using negated = std::negation<Cmp_T<typename LHS_Trans_T<LHS_T>::type, typename RHS_Trans_T<RHS_T>::type>>;
+	template<COMPARE Cmp_T, TRANSFORM LHS_Trans_T, TRANSFORM RHS_Trans_T>
+	struct transformed_individual { 
+		template<typename LHS_T, typename RHS_T> using type = cmp::transformed_individual<LHS_T, RHS_T, Cmp_T, LHS_Trans_T, RHS_Trans_T>;
+		template<typename LHS_T, typename RHS_T> using negated = std::negation<type<LHS_T, RHS_T>>;
 	};
 
 	template<COMPARE Cmp_T, TRANSFORM RHS_Trans_T> struct transformed_rhs : transformed_individual<Cmp_T, std::type_identity, RHS_Trans_T> { };
-	template<COMPARE Cmp_T, TRANSFORM LHS_Trans_T> struct transformed_lhs : transformed_individual<Cmp_T, LHS_Trans_T> { };
+	template<COMPARE Cmp_T, TRANSFORM LHS_Trans_T> struct transformed_lhs : transformed_individual<Cmp_T, LHS_Trans_T, std::type_identity> { };
 }
 
-// [X] prioritize if
-namespace util::cmp::build {
+static_assert(util::cmp::transformed_v<int, const int, std::is_same, std::remove_const>, "");
+static_assert(!util::cmp::transformed_v<int, const float, std::is_same, std::remove_const>, "");
 
+static_assert(util::cmp::transformed_lhs_v<int, const int, std::is_same, std::add_const>, "");
+static_assert(!util::cmp::transformed_rhs_v<int, const float, std::is_same, std::add_const>, "");
+
+
+
+// [ ] prioritize if
+namespace util::cmp {
+	template<typename LHS_T, typename RHS_T, MATCH Match_T> struct prioritize_if : 
+		std::disjunction<std::negation<Match_T<LHS_T>>, Match_T<RHS_T>> { };
+	
+	template<typename LHS_T, typename RHS_T, MATCH Match_T> 
+	static constexpr bool prioritize_if_v = prioritize_if<LHS_T, RHS_T, Match_T>::value;
+}
+namespace util::cmp::build {
+	
+	// TODO: finish compare priority list 
 	/// @brief constructs a compare template predicate from a match template predicate.
 	/// @tparam Match_T a template taking 1 argument with a static constexpr boolean value, eg std::is_const
 	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
-	template<MATCH Match_T, TRANSFORM Trans_T = std::type_identity> struct prioritize_if {
-		template<typename LHS_T, typename RHS_T> using negated = std::conjunction<Match_T<typename Trans_T<LHS_T>::type>, std::negation<Match_T<typename Trans_T<RHS_T>::type>>>;
-		template<typename LHS_T, typename RHS_T> using type = std::disjunction<std::negation<Match_T<typename Trans_T<LHS_T>::type>>, Match_T<typename Trans_T<RHS_T>::type>>;
+	template<MATCH Match_T> struct prioritize_if {
+		template<typename LHS_T, typename RHS_T> using type = cmp::prioritize_if<LHS_T, RHS_T, Match_T>;
+		template<typename LHS_T, typename RHS_T> using negated = std::negation<type<LHS_T, RHS_T>>;
 	};
 }
 
-namespace util::cmp::build {
-	/*
-
-	Cmp_T<LHS,RHS> == Cmp_T<RHS,LHS> -> NEXT_CMP
-
-	Cmp_T<>
-
-
-
-	A < B = 0, B < A = 0 -> A == B
-	A < B = 0, B < A = 1 -> A != B && A > B
-	A < B = 1, B < A = 0 -> A != B && A < B 
-	A < B = 1, B < A = 1 -> NULL
-
-	C = A < B
-	D = B < A
-
-	'C'D = '(A<B)'(B<A) = A equals B
-	'CD = '(A<B)(B<A) = A greater than B
-	C'D = (A<B)'(B<A) = A less than B
-	CD = (A<B)(B<A) = NULL
-
-	CURR = Cmp_T<A, B>
-	NEXT = 
-	!(A XOR B) && (CURR) + (A XOR B) && NEXT
-
-	*/
-	template<COMPARE ... Cmp_Ts> struct priority_list;
-
-	template<> struct priority_list<> {
-		template<typename LHS, typename RHS> using type = std::bool_constant<false>; // equal defaults to false
-	};
-
-	template<COMPARE Cmp_T, COMPARE ... Cmp_Ts> struct priority_list<Cmp_T, Cmp_Ts...> {
-		template<typename LHS, typename RHS> using type = std::bool_constant<
-			(Cmp_T<LHS, RHS>::value != Cmp_T<RHS, LHS>::value && Cmp_T<LHS, RHS>::value) || 
-			(Cmp_T<LHS, RHS>::value == Cmp_T<RHS, LHS>::value && priority_list<Cmp_Ts...>::template type<LHS, RHS>::value)>;
-	};
-
+// [ ] match transformed
+namespace util::mtc {
+	template<typename T, MATCH Match_T, TRANSFORM Trans_T> struct transformed : Match_T<typename Trans_T<T>::type> { };
+	template<typename T, MATCH Match_T, TRANSFORM Trans_T> using transformed_v = transformed<T, Match_T, Trans_T>::value;
 }
-
-// [X] match transformed
 namespace util::mtc::build {
 	/// @brief constructs a match template predicate, transforms input arguments before passing to match
 	/// @tparam Match_T a template taking 1 argument with a static constexpr boolean value, eg std::is_const
 	/// @tparam Trans_Ts a template taking 1 typename arg, with a typename member alias "type", eg std::remove_const
 	template<MATCH Match_T, TRANSFORM Trans_T> struct transformed { 
-		template<typename T> using type = Match_T<typename Trans_T<T>::type>; 
-		template<typename T> using negated = std::negation<Match_T<typename Trans_T<T>::type>>; };
+		template<typename T> using type = Match_T<typename util::mtc::transformed<T, Match_T, Trans_T>::type>; 
+		template<typename T> using negated = std::negation<type<T>>; };
 }
 
-// [X] post_conditional
+// [ ] post_conditional
 namespace util::trn {
 
 	template<typename T, TRANSFORM Trans_T, MATCH Match_T, TRANSFORM If_T, TRANSFORM Else_T = trn::build::set<>::type, typename=void>
@@ -417,6 +455,7 @@ namespace util::trn::build {
 	struct post_conditional { template<typename T> using type = trn::post_conditional<T, Trans_T, Match_T, If_T, Else_T>; };
 }
 
+// [ ] propergate_const
 namespace util::trn {
 	template<typename T, TRANSFORM Trans_T>
 	struct propergate_const : trn::post_conditional<T, Trans_T, std::is_const, std::add_const> { };
@@ -429,7 +468,6 @@ namespace util::trn {
 	using propergate_const_each_t = typename propergate_const_each<T, Trans_T>::type;
 	
 }
-
 namespace util::trn::build {
 	template<TRANSFORM Trans_T>
 	struct propergate_const { template<typename T> using type = trn::propergate_const<T, Trans_T>; };
@@ -437,7 +475,7 @@ namespace util::trn::build {
 	struct propergate_const_each { template<typename T> using type = trn::propergate_const_each<T, Trans_T>; };
 }
 
-// [X] subset
+// [ ] subset
 namespace util::mtc::build {
 	template<typename SuperSet_T, COMPARE Cmp_T>
 	struct subset_of;

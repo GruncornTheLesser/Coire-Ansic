@@ -45,11 +45,7 @@ namespace ecs {
 
 		struct entity : public resource, util::unpaged_block<std::pair<ecs::entity, uint32_t>> {
 			using resource_container = archetype<Ts...>;
-		
-			size_t& size() { return n; }
-			size_t size() const { return n; }
-		private:
-			size_t n = 0;
+			size_t size = 0;
 		};
 
 		// the set of resources associated with this contianer
@@ -69,7 +65,8 @@ namespace ecs {
 		template<typename ... Us>
 		void sync() {
 			std::cout << "syncing container: " << util::type_name<archetype<Ts...>>() << " = {";
-			((std::cout << std::string(util::type_name<Us>()).substr(util::type_name<archetype<Ts...>>().size()) << ", "  ), ...);
+			((std::cout << std::string(util::type_name<Us>()).substr(util::type_name<archetype<Ts...>>().size()
+						 + (std::is_const_v<Us> ? 8 : 2)) << ", "  ), ...); // const (+6)archetype<Ts...>(+n)::(+2)
 			std::cout << "\b\b}" << std::endl;
 			// TODO: finish me
 			// NOTE: can deadlock if needs to acquire new resource oopsies
@@ -84,15 +81,9 @@ namespace ecs {
 	};
 
 	namespace traits { 
-		DECL_GET_ATTRIB_TYPE(pool, ecs::archetype<std::remove_const_t<T>>) // gets T::pool, defaults to archetype<T>
-
-		template<typename T> struct get_pool_index_storage { using type = typename get_pool_t<T>::index; };
-		template<typename T> using get_pool_index_storage_t = get_pool_index_storage<T>;
-		template<typename T> struct get_pool_entity_storage { using type = typename get_pool_t<T>::entity; };
-		template<typename T> using get_pool_entity_storage_t = get_pool_entity_storage<T>;
-		template<typename T> struct get_pool_component_storage { using type = typename get_pool_t<T>::template comp<T>; };
-		template<typename T> using get_pool_component_storage_t = get_pool_component_storage<T>;
+		template<typename T> struct default_pool { using type = ecs::archetype<std::remove_const_t<T>>; };
 	}
+
 	template<typename T>
 	using pool = util::trn::propergate_const_t<T, traits::get_pool>;
 }

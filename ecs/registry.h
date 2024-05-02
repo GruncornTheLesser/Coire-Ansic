@@ -15,7 +15,7 @@ namespace ecs {
 		using resource_data_t = std::unordered_map<std::type_index, erased_ptr>;
 	public:
 		template<typename U, typename ... Arg_Us>
-		U& get_resource(Arg_Us ... args) requires(std::is_constructible_v<U, Arg_Us...>);
+		U& get_resource(Arg_Us ... args);
 
 		template<typename U>
 		void erase_resource();

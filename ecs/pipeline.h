@@ -35,31 +35,32 @@ namespace ecs {
 		void unlock();
 		void sync();
 
-		template<traits::pipeline_accessible_class<pipeline_t<Ts...>> U>
+		template<traits::accessible_resource_class<pipeline_t<Ts...>> U>
 		U& get_resource();
 
 		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename ... Arg_Us> 
-			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>) && 
+			requires (traits::is_accessible_resource_v<Policy_U<U>, pipeline_t<Ts...>>) && 
 			std::is_constructible_v<U, Arg_Us...>
 		Policy_U<U>::emplace_return emplace(ecs::entity e, Arg_Us&& ... args);
 		
 		template<typename U, template<typename> typename Policy_U = ecs::deferred, typename It, typename ... Arg_Us> 
-			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>) && 
+			requires (traits::is_accessible_resource_v<Policy_U<U>, pipeline_t<Ts...>>) && 
 			std::is_constructible_v<U, Arg_Us...>
 		Policy_U<U>::emplace_return emplace(It first, It last, Arg_Us&& ... args);
 
 		template<typename U, template<typename> typename Policy_U = deferred> 
-			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>)
+			requires (traits::is_accessible_resource_v<Policy_U<U>, pipeline_t<Ts...>>)
 		void erase(ecs::entity e);
 
 		template<typename U, template<typename> typename Policy_U = deferred, typename It> 
-			requires (traits::is_pipeline_accessible_v<Policy_U<U>, pipeline_t<Ts...>>)
+			requires (traits::is_accessible_resource_v<Policy_U<U>, pipeline_t<Ts...>>)
 		void erase(It first, It last);
 
-		template<traits::pipeline_accessible_class<pipeline_t<Ts...>> ... Select_Us, 
-			typename from_T = ecs::view_from_builder<ecs::select<Select_Us...>>::type, 
-			typename where_T = ecs::view_where_builder<ecs::select<Select_Us...>, from_T>::type>
-		view<select<Select_Us...>, from_T, where_T, pipeline_t<Ts...>&> view(from_T from = {}, where_T where = {});
+		template<typename ... select_Us, 
+			typename from_T = ecs::view_from_builder<ecs::select<select_Us...>>::type, 
+			typename where_T = ecs::view_where_builder<ecs::select<select_Us...>, from_T>::type>
+			requires (traits::is_accessible_resource_v<std::tuple<ecs::select<select_Us...>, from_T, where_T>, pipeline_t<Ts...>>)
+		view<select<select_Us...>, from_T, where_T, pipeline_t<Ts...>&> view(from_T from = {}, where_T where = {});
 
 		
 

@@ -46,8 +46,8 @@ pool:
 #include "ecs/view.h"
 #include "ecs/pool.h"
 
-struct A;
-struct B;
+struct A { int a; };
+struct B { int b; };
 
 //struct A { using pool = ecs::archetype<A, B>; };
 //struct B { using pool = ecs::archetype<A, B>; };
@@ -55,51 +55,65 @@ struct B;
 struct C { };
 struct D { };
 struct E { };
-
+struct F { };
 //static_assert(ecs::pipeline<ecs::pool<A>>::is_accessible<ecs::pool<A>::entity>, "");
 #include "ecs/util/type_name.h"
 #include <vector>
 #include <iostream>
-template<typename T> struct get_resource_set { using type = std::tuple<int, const float>; };
-template<typename T> struct is_resource : std::is_const<T> { };
-template<typename T> struct get_pool { using type = std::array<T, 1>; };
+
+struct ContainerTest;
+struct ResourceTest : ecs::resource { 
+	ResourceTest(size_t data) : data(data) { }
+	using resource_container = ContainerTest; size_t data; };
+
+struct ContainerTest {
+	using resource_set = std::tuple<ResourceTest>;
+	using synchronization_set = std::tuple<ResourceTest>;
+
+	template<typename T>
+	T& get_resource() { return std::get<T>(set); };
+	
+	template<typename ... Us>
+	void sync() { }
+
+	resource_set set;
+};
+
 
 int main() {
-	ecs::registry reg;
-	std::cout << util::type_name<ecs::pipeline_builder<const ecs::pool<int>, float>::type>() << std::endl;
-	/*
 	{
-		auto pip = reg.pipeline<ecs::pool<int>, ecs::pool<float>, ecs::pool<char>>();
-		std::lock_guard guard(pip);
-
-		auto e = ecs::entity{0ull};
-		pip.emplace<int, ecs::immediate>(e, 1);
-		pip.emplace<float, ecs::immediate>(e, 1.0f);
-		pip.emplace<char, ecs::immediate>(e, '1');
+		ecs::registry reg;
+		auto& reg_res = reg.get_resource<ResourceTest>(54534ull);
+		auto pip = reg.pipeline<ResourceTest>();
+		auto& pip_res = pip.get_resource<ResourceTest>();
+		
+		assert(reg_res.data == 54534);
+		assert(pip_res.data == 54534);
 	}
-	
 	{
-		using view_pip = ecs::pipeline<ecs::pool<int>, ecs::pool<float>, ecs::pool<char>>;
-		using view_it = ecs::view_iterator<ecs::select<ecs::entity, int, float, char>, ecs::from<float>, 
-			ecs::where<ecs::include<int, float, char>>, view_pip>;
-		using view_ref = ecs::view_reference<ecs::select<int, float, char>, ecs::from<int>, view_pip>;
+		ecs::registry reg;
+		auto pip = reg.pipeline<A, B, C>();
 
-		auto pip = reg.pipeline<ecs::pool<int>, ecs::pool<float>, ecs::pool<char>>();
-		std::lock_guard guard(pip);
-		//auto [i, f, c] = view_ref{ pip, 0ull };
+		for (uint32_t i = 0; i < 12; ++i) {
+			pip.emplace<A, ecs::immediate>(ecs::entity{i}, i); 
+			pip.emplace<B, ecs::immediate>(ecs::entity{i}, i);
+		}
 
-		//std::cout << i << f << c << std::endl;
+		auto view1 = reg.view<ecs::entity, A, const B>();
+		auto it = view1.rbegin();
+		auto end = view1.rend();
+		while(it != end) {
+			auto [e, a, b] = *it++;
+			std::cout << e << ", " << a.a << ", " << b.b << std::endl;
+		}
+		
+		auto view2 = pip.view<ecs::entity, A, const B>();
+		for (auto [e, a, b] : view2) {
+			std::cout << e << ", " << a.a << ", " << b.b << std::endl;
+		}
+		
+		
 	}
-	
-	auto pip = reg.pipeline<const ecs::pool<A>>();
-	{
-		std::lock_guard guard(pip);
-		const ecs::pool<A>::entity& pl_e = pip.get_resource<const ecs::pool<A>::entity>();
-	}
-
-	//auto view = reg.view<ecs::entity, A, B>(ecs::from<C>{}, ecs::where<ecs::include<A, B>>{});
-	//auto& [e, a, b] = *view.begin();
-	*/
 }
 
 /*

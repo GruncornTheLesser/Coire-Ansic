@@ -191,10 +191,16 @@ namespace util {
 	template<typename T>
 	class paged_block_iterator {
 	public:
+		using iterator_category = std::random_access_iterator_tag;
+		using value_type = T;
+        using pointer = T*;
+        using reference = T&;
+		using difference_type = std::ptrdiff_t;
+		
 		paged_block_iterator(size_t index, T** pages) : index(index), pages(pages) { }
 		
-		T& operator*() { return pages[index / paged_block<T>::page_size][index % paged_block<T>::page_size]; }
-		T* operator->() { return this->operator*(); }
+		reference operator*() { return pages[index / paged_block<T>::page_size][index % paged_block<T>::page_size]; }
+		pointer operator->() { return this->operator*(); }
 		
 		paged_block_iterator<T> operator++() { ++index; return *this; }
 		paged_block_iterator<T> operator++(int) { paged_block_iterator<T> temp = *this; ++index; return temp; }
@@ -203,7 +209,7 @@ namespace util {
 		paged_block_iterator<T> operator+(int n) { return { index + n, pages }; }
 		paged_block_iterator<T> operator-(int n) { return { index - n, pages }; }
 		
-		ptrdiff_t operator-(const paged_block_iterator<T>& other) { return index - other.index; }
+		difference_type operator-(const paged_block_iterator<T>& other) { return index - other.index; }
 		
 		bool operator==(const paged_block_iterator<T>& other) { return index == other.index; }
 		bool operator!=(const paged_block_iterator<T>& other) { return index != other.index; }
@@ -268,10 +274,16 @@ namespace util {
 	template<typename T>
 	class unpaged_block_iterator {
 	public:
+		using iterator_category = std::random_access_iterator_tag;
+		using value_type = T;
+        using pointer = T*;
+        using reference = T&;
+		using difference_type = std::ptrdiff_t;
+
 		unpaged_block_iterator(T* ptr) : ptr(ptr) { }
 
-		T& operator*() { return *ptr; }
-		T* operator->() { return ptr; }
+		reference operator*() { return *ptr; }
+		pointer operator->() { return ptr; }
 		
 		unpaged_block_iterator<T> operator++() { ++ptr; return *this; }
 		unpaged_block_iterator<T> operator++(int) { unpaged_block_iterator<T> temp = *this; ++ptr; return temp; }
@@ -280,7 +292,7 @@ namespace util {
 		unpaged_block_iterator<T> operator+(int n) { return { ptr + n }; }
 		unpaged_block_iterator<T> operator-(int n) { return { ptr - n }; }
 		
-		ptrdiff_t operator-(const unpaged_block_iterator& other) { return ptr - other.ptr; }
+		difference_type operator-(const unpaged_block_iterator& other) { return ptr - other.ptr; }
 		
 		bool operator==(const unpaged_block_iterator<T>& other) { return ptr == other.ptr; }
 		bool operator!=(const unpaged_block_iterator<T>& other) { return ptr != other.ptr; }

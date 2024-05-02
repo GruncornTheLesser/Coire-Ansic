@@ -66,7 +66,7 @@ void ecs::pipeline_t<Ts...>::unlock() {
 }
 
 template<typename ... Ts>
-template<ecs::traits::pipeline_accessible_class<ecs::pipeline_t<Ts...>> U>
+template<ecs::traits::accessible_resource_class<ecs::pipeline_t<Ts...>> U>
 U& ecs::pipeline_t<Ts...>::get_resource() {
 	if constexpr (traits::has_resource_container_v<U>)
 		return std::get<typename traits::get_resource_container_t<U>*>(set)->template get_resource<U>();
@@ -76,7 +76,7 @@ U& ecs::pipeline_t<Ts...>::get_resource() {
 
 template<typename ... Ts>
 template<typename U, template<typename> typename Policy_U, typename ... Arg_Us>
-	requires (ecs::traits::is_pipeline_accessible_v<Policy_U<U>, ecs::pipeline_t<Ts...>>) && 
+	requires (ecs::traits::is_accessible_resource_v<Policy_U<U>, ecs::pipeline_t<Ts...>>) && 
 	std::is_constructible_v<U, Arg_Us...>
 Policy_U<U>::emplace_return ecs::pipeline_t<Ts...>::emplace(entity e, Arg_Us&& ... args)
 {
@@ -85,14 +85,15 @@ Policy_U<U>::emplace_return ecs::pipeline_t<Ts...>::emplace(entity e, Arg_Us&& .
 
 template<typename ... Ts>
 template<typename U, template<typename> typename Policy_U>
-	requires (ecs::traits::is_pipeline_accessible_v<Policy_U<U>, ecs::pipeline_t<Ts...>>)
+	requires (ecs::traits::is_accessible_resource_v<Policy_U<U>, ecs::pipeline_t<Ts...>>)
 void ecs::pipeline_t<Ts...>::erase(entity e)
 {
 	Policy_U<U>::template erase(*this, e);
 }
 
 template<typename ... Ts>
-template<ecs::traits::pipeline_accessible_class<ecs::pipeline_t<Ts...>> ... Us, typename from_T, typename where_T>
+template<typename ... Us, typename from_T, typename where_T>
+	requires (ecs::traits::is_accessible_resource_v<std::tuple<ecs::select<Us...>, from_T, where_T>, ecs::pipeline_t<Ts...>>)
 ecs::view<ecs::select<Us...>, from_T, where_T, ecs::pipeline_t<Ts...>&> 
 ecs::pipeline_t<Ts...>::view(from_T, where_T) {
 	return *this;

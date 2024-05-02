@@ -28,19 +28,18 @@ namespace ecs {
 		template<typename pip_T, typename ... Arg_Ts>
 		static inline emplace_return emplace(pip_T& pip, ecs::entity e, Arg_Ts&& ... args)
 		{
-			auto& entt_arr = pip.template get_resource<typename ecs::pool<T>::entity>();
-			auto& index_arr = pip.template get_resource<typename ecs::pool<T>::index>();
-			auto& comp_arr = pip.template get_resource<typename ecs::pool<T>::template comp<T>>();
+			auto& entt_arr = pip.template get_resource<traits::entity_storage_t<T>>();
+			auto& index_arr = pip.template get_resource<traits::entity_index_t<T>>();
+			auto& comp_arr = pip.template get_resource<traits::entity_component_t<T>>();
 
-			size_t n = ++entt_arr.size();
+			size_t n = ++entt_arr.size;
 			
 			index_arr.reserve(e);
 			entt_arr.reserve(n);
 			comp_arr.reserve(n);
 
-			--n; // back;
-			index_arr[e] = n;
-			std::construct_at(&entt_arr[n], e, 0);
+			index_arr[e] = --n;
+			entt_arr[n] = std::pair{e, 0ull};
 
 			return *std::construct_at(&comp_arr[n], std::forward<Arg_Ts>(args)...);
 		}
@@ -51,9 +50,6 @@ namespace ecs {
 			auto& entt_arr = pip.template get_resource<typename ecs::pool<T>::entity>();
 			auto& index_arr = pip.template get_resource<typename ecs::pool<T>::index>();
 			auto& comp_arr = pip.template get_resource<typename ecs::pool<T>::template comp<T>>();
-
-			
-
 		}
 
 		template<typename pip_T>

@@ -55,13 +55,12 @@ namespace ecs {
 	template<typename select_T, typename from_T, typename where_T, typename pip_T>
 	class view {
 	public:
-		using pip_storage = std::conditional_t<std::is_reference_v<pip_T>, pip_T, pip_T&>;
+		using resource_set = std::tuple<select_T, from_T, where_T>;
+
 		using iterator = view_iterator<select_T, from_T, where_T, pip_T>;
 		using const_iterator = view_iterator<util::trn::each_t<select_T, std::add_const>, from_T, where_T, pip_T>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-
-		using resource_set = std::tuple<select_T, from_T, where_T>;
 
 		view(pip_T&& base);
 
@@ -77,16 +76,22 @@ namespace ecs {
 		const_iterator rbegin() const;
 		const_iterator rend() const;
 	private:
-		pip_storage pip;
+		pip_T pip;
 	};
 
 	template<typename select_T, typename from_T, typename where_T, typename pip_T>
 	class view_iterator {
 	public:
-		using reference = view_reference<select_T, from_T, pip_T>;
-		using const_reference = view_reference<util::trn::each_t<select_T, std::add_const>, from_T, pip_T>;
 		
-		view_iterator(pip_T& pip, size_t index);
+		using iterator_category = std::random_access_iterator_tag;
+		using value_type = view_reference<select_T, from_T, pip_T>;
+        using reference = view_reference<select_T, from_T, pip_T>;
+		using const_reference = view_reference<util::trn::each_t<select_T, std::add_const>, from_T, pip_T>;
+		//using pointer = T*;
+		//using const_pointer = const T*;
+		using difference_type = std::ptrdiff_t;
+
+		view_iterator(pip_T& pip, int index);
 
 		reference operator*();
 
@@ -107,7 +112,7 @@ namespace ecs {
 	private:
 		entity ent;
 		pip_T& pip;
-		size_t ind;
+		ptrdiff_t ind;
 	};
 
 	template<typename select_T, typename from_T, typename pip_T>

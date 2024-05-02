@@ -36,16 +36,15 @@ T& ecs::registry::erased_ptr::get() {
 #pragma GCC diagnostic pop
 
 template<typename U, typename ... Arg_Us>
-U& ecs::registry::get_resource(Arg_Us ... args) requires(std::is_constructible_v<U, Arg_Us...>) {
+U& ecs::registry::get_resource(Arg_Us ... args) {
 	// get resource position
-	std::type_index key = typeid(ecs::traits::get_resource_container_t<std::remove_const_t<U>>);
+	std::type_index key = typeid(traits::get_resource_container_t<std::remove_const_t<U>>);
 	resource_data_t::iterator it = data.find(key);
 	if (it == data.end()) // if key not found
 		if constexpr (std::is_constructible_v<U, Arg_Us...>)
 			it = data.emplace_hint(it, key, new U{ std::forward<Arg_Us>(args)... });
 		else
-			throw std::runtime_error(std::string("registry does not contain data/ could not default construct '") + std::string(util::type_name<U>() + "'"));
-	// 
+			throw std::runtime_error(std::string("registry does not contain data/could not construct '") + std::string(util::type_name<U>()) + "'");
 	return it->second.get<U>();
 }
 
