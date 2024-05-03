@@ -1,5 +1,4 @@
-#ifndef ECS_SPARSE_MAP_H
-#define ECS_SPARSE_MAP_H
+#pragma once
 #include <memory>
 #include <exception>
 #include <cassert>
@@ -102,9 +101,6 @@ namespace util {
 
 	template<typename T> class paged_block;
 	template<typename T> class paged_block_iterator;
-	
-	template<typename T> class unpaged_block;
-	template<typename T> class unpaged_block_iterator;
 
 	template<typename T>
 	class paged_block {
@@ -223,6 +219,9 @@ namespace util {
 		T** pages;
 	};
 
+	template<typename T> class unpaged_block;
+	template<typename T> class unpaged_block_iterator;
+
 	template<typename T> 
 	class unpaged_block {
 	public:
@@ -306,5 +305,3 @@ namespace util {
 	};
 
 }
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef ECS_ENTITY_H
-#define ECS_ENTITY_H
+#pragma once
 #include <cstdint>
 
 namespace ecs {
@@ -13,5 +12,3 @@ namespace ecs {
 
 	const entity tombstone;
 }
-
-#endif

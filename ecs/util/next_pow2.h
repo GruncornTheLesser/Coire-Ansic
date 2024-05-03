@@ -1,5 +1,4 @@
-#ifndef ECS_NEXT_POW2_H
-#define ECS_NEXT_POW2_H
+#pragma once
 #include <stdint.h>
 
 namespace util {
@@ -28,5 +27,3 @@ namespace util {
 		return v;
 	}
 }
-
-#endif

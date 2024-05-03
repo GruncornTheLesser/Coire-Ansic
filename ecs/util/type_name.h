@@ -1,5 +1,4 @@
-#ifndef ECS_TYPE_NAME_H
-#define ECS_TYPE_NAME_H
+#pragma once
 #include <string_view>
 
 #if defined(__clang__)
@@ -26,5 +25,3 @@ namespace util { // NOTE: when changing the namespace of this func you must upda
 	template<typename LHS_T, typename RHS_T> 
 	struct alpha_lt : std::bool_constant<util::type_name<LHS_T>() < util::type_name<RHS_T>()> { };
 }
-
-#endif

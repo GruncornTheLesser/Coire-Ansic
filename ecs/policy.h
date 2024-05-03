@@ -1,5 +1,4 @@
-#ifndef ECS_POLICY_H
-#define ECS_POLICY_H
+#pragma once
 
 namespace ecs {
 	template<typename T>
@@ -29,8 +28,8 @@ namespace ecs {
 		static inline emplace_return emplace(pip_T& pip, ecs::entity e, Arg_Ts&& ... args)
 		{
 			auto& entt_arr = pip.template get_resource<traits::entity_storage_t<T>>();
-			auto& index_arr = pip.template get_resource<traits::entity_index_t<T>>();
-			auto& comp_arr = pip.template get_resource<traits::entity_component_t<T>>();
+			auto& index_arr = pip.template get_resource<traits::index_storage_t<T>>();
+			auto& comp_arr = pip.template get_resource<traits::component_storage_t<T>>();
 
 			size_t n = ++entt_arr.size;
 			
@@ -61,5 +60,3 @@ namespace ecs {
 		}
 	};
 }
-
-#endif 

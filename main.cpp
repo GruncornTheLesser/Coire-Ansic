@@ -1,15 +1,15 @@
-// view must be included first, 
-// view includes pipeline and so includes it before beginning, 
-
 /* Design:
 class registry: a type erased resource storage map. only one resource of a resource type is stored in the registry. has 2 functions:
-	get<resource>() - returns the resource, if not initialized, initializes resource
-	erase<resource>() - if a resource is stored in a resource_container, erases the containers and all associated resources
+	get_resource<T>() - returns the resource, if not initialized, initializes resource
+	erase_resource<T>() - if a resource is stored in a resource_container, erases the containers and all associated resources
+	view() - creates a view
 
-interface resource countainer: a resource is a lockable set of data. it has 2 required functions:
+interface resource: a resource is a lockable set of data. it has 2 required functions:
 	acquire() - locks mutex/s for access
 	release() - unlocks mutex/s for access
-	resource_container - the resource_container that stores this resource. by default a resource is it's own container
+	resource_container[optional] - the resource_container that stores this resource. by default a resource is it's own container
+
+storage: the resources owned by archetype
 
 interface resource_container: a class containing one or more resources. it has 2 required functions:
 	get_resource<T>() - where T is a resource contained by the resource storage class
@@ -17,13 +17,18 @@ interface resource_container: a class containing one or more resources. it has 2
 	synchronization_set - a tuple of resources that if sync'd together are passed as types when this resource is sync'd 
 		defaults to std::tuple<T>
 
-class pipeline: a class containing a pointers to resource containers, initialized from registry. has 2 functions:
-	lock() - acquires all resource, without causing a deadlock
+class pipeline: a class containing a pointers to resource containers, initialized from registry. 
+	collects resources from arguments's resource_set. the pipeline is the main point of contact 
+	has 2 mutex functions:
+	lock() - acquires all resource, ensures no deadlocks
 	unlock() - calls sync<Ts...>() on each of resource_containers, releases all resources 
-
-class archetype<Ts...>: a resource_container, stores 2 resources plus 1 resource per component. 
+	emplace
+	erase
+	view - creates a view from the pip
 
 class view: a class for iterating through pools
+
+class archetype<Ts...>: a component pool, stores 2 resources plus 1 resource per component. 
 
 
 entity: a unique ID representing a set of components
@@ -32,87 +37,116 @@ pool type-attribute which defines which pool stores this component. defaults to 
 pool: 
 */
 
-// TODO: fuck around with adding serialization options... on pool
-
-// TODO: sort out actual pool implementations, and interface mechanic. 
-// a pool could have a function set which is actually a class and associates a resource with an operator()
-// I would love to be able to dynamically inherit the functionality them but that's maybe over complicated.
-// could be done with a diamond inheritance structure but those are kinda grim and stinky.
-// alternatively I could keep it simple and just declare a mirror set of functions in the pipeline.
-// this would be repated again in registry. suddenly becomes all a bit grim...
-
 #include "ecs/registry.h"
 #include "ecs/pipeline.h"
 #include "ecs/view.h"
 #include "ecs/pool.h"
 
-struct A { int a; };
-struct B { int b; };
-
-//struct A { using pool = ecs::archetype<A, B>; };
-//struct B { using pool = ecs::archetype<A, B>; };
+struct A;
+struct B;
+struct A { int a; using pool = ecs::archetype<A, B>; };
+struct B { int b; using pool = ecs::archetype<A, B>; };
 
 struct C { };
 struct D { };
 struct E { };
 struct F { };
-//static_assert(ecs::pipeline<ecs::pool<A>>::is_accessible<ecs::pool<A>::entity>, "");
 #include "ecs/util/type_name.h"
 #include <vector>
 #include <iostream>
 
-struct ContainerTest;
-struct ResourceTest : ecs::resource { 
-	ResourceTest(size_t data) : data(data) { }
-	using resource_container = ContainerTest; size_t data; };
+namespace ecs2 {
+	struct at{ 
+		template<typename T> using resource_set = std::tuple<ecs::traits::index_storage_t<T>>; 
+		size_t index; 
+	};
+	struct back {
+		template<typename T> using resource_set = std::tuple<>;
+	};
+	struct front { 
+		template<typename T> using resource_set = std::tuple<>;
+	};
 
-struct ContainerTest {
-	using resource_set = std::tuple<ResourceTest>;
-	using synchronization_set = std::tuple<ResourceTest>;
+	struct deferred {
+		template<typename T> using resource_set = std::tuple<ecs::pool<T>>;
 
-	template<typename T>
-	T& get_resource() { return std::get<T>(set); };
+		template<typename Pip_T, typename T, typename Ent_T, typename Pos_T, typename ... Arg_Ts>
+		auto emplace(Pip_T pip, Ent_T ent, Pos_T pos, Arg_Ts&& ... args);
+
+		template<typename Pip_T, typename T, typename Ent_T, typename ... Arg_Ts>
+		auto erase(Pip_T pip, Ent_T ent, Arg_Ts&& ... args);
+	};
+	struct immediate {
+		template<typename T> using resource_set = std::tuple<ecs::pool<T>>;
+
+		template<typename Pip_T, typename T, typename Ent_T, typename Pos_T, typename ... Arg_Ts>
+		auto emplace(Pip_T pip, Ent_T ent, Pos_T pos, Arg_Ts&& ... args);
+
+		template<typename Pip_T, typename T, typename Ent_T, typename ... Arg_Ts>
+		auto erase(Pip_T pip, Ent_T ent, Arg_Ts&& ... args);
+	};
+}
+
+namespace ecs2::traits {
+	template<typename T> struct is_position_arg : std::disjunction<std::is_same<T, back>, std::is_same<T, at>, std::is_same<T, front>> { };
+
+	template<typename T, typename What_T, typename=void> struct is_input_arg : std::is_same<T, What_T> { };
+	template<typename T, typename What_T> struct is_input_arg<T, What_T, std::void_t<
+		decltype(std::begin(std::declval<T&>())), decltype(std::end(std::declval<T&>()))>> : 
+	std::conjunction<
+		std::is_same<std::remove_cvref_t<decltype(*std::begin(std::declval<T>()))>, What_T>, 
+		std::is_same<std::remove_cvref_t<decltype(*std::begin(std::declval<T>()))>, What_T>> { }; 
 	
-	template<typename ... Us>
-	void sync() { }
+	template<typename T, typename=void> struct is_exection_arg : std::true_type { };
 
-	resource_set set;
-};
+	template<typename T, typename What_T> concept input_arg_class = is_input_arg<T, What_T>::value;
+	template<typename T> concept position_arg_class = is_position_arg<T>::value;
+	template<typename T> concept exection_arg_class = is_exection_arg<T>::value;
+}
 
+template<typename T, 
+	ecs2::traits::exection_arg_class exec_T = ecs2::immediate, 
+	ecs2::traits::input_arg_class<ecs::entity> ent_T = ecs::entity, 
+	ecs2::traits::position_arg_class pos_T = ecs2::back, 
+	typename ... Arg_Ts>
+void emplace_at(ent_T what, pos_T pos, Arg_Ts ... args) { }
+
+template<typename T, 
+	ecs2::traits::exection_arg_class exec_T = ecs2::immediate, 
+	ecs2::traits::input_arg_class<ecs::entity> ent_T = ecs::entity, 
+	typename ... Arg_Ts>
+void emplace(ent_T, Arg_Ts ... args) { }
 
 int main() {
-	{
-		ecs::registry reg;
-		auto& reg_res = reg.get_resource<ResourceTest>(54534ull);
-		auto pip = reg.pipeline<ResourceTest>();
-		auto& pip_res = pip.get_resource<ResourceTest>();
-		
-		assert(reg_res.data == 54534);
-		assert(pip_res.data == 54534);
+	ecs::entity e = 0;
+	std::vector<ecs::entity> e_arr;
+
+	emplace_at<int>(e, ecs2::back{});
+	emplace_at<int>(e, ecs2::at(1), 0.0f);
+	emplace_at<int>(e, ecs2::front{});
+	emplace_at<int>(e, ecs2::front{});
+	emplace<int>(e);
+	emplace<int>(e);
+	emplace<int>(e_arr);
+
+	ecs::registry reg;
+	auto pip = reg.pipeline<A, B, C>();
+
+	for (uint32_t i = 0; i < 12; ++i) {
+		pip.emplace<A, ecs::immediate>(ecs::entity{i}, i); 
+		pip.emplace<B, ecs::immediate>(ecs::entity{i}, i);
 	}
+
+	auto view1 = reg.view<ecs::entity, A, const B>();
+	for (auto it = view1.rbegin(); it != view1.rend(); ++it) 
 	{
-		ecs::registry reg;
-		auto pip = reg.pipeline<A, B, C>();
+		//auto [e, a, b] = *it;
+		//std::cout << e << ", " << a.a << ", " << b.b << std::endl;
+	}
 
-		for (uint32_t i = 0; i < 12; ++i) {
-			pip.emplace<A, ecs::immediate>(ecs::entity{i}, i); 
-			pip.emplace<B, ecs::immediate>(ecs::entity{i}, i);
-		}
-
-		auto view1 = reg.view<ecs::entity, A, const B>();
-		auto it = view1.rbegin();
-		auto end = view1.rend();
-		while(it != end) {
-			auto [e, a, b] = *it++;
-			std::cout << e << ", " << a.a << ", " << b.b << std::endl;
-		}
-		
-		auto view2 = pip.view<ecs::entity, A, const B>();
-		for (auto [e, a, b] : view2) {
-			std::cout << e << ", " << a.a << ", " << b.b << std::endl;
-		}
-		
-		
+	auto view2 = pip.view<ecs::entity, A, const B>();
+	for (auto [e, a, b] : view2) {
+		//std::cout << e << ", " << a.a << ", " << b.b << std::endl;
 	}
 }
 

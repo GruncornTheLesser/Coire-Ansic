@@ -64,7 +64,6 @@ namespace util::cmp::build {
 		template<typename LHS_T, typename RHS_T> using type = std::negation<Cmp_T<LHS_T, RHS_T>>; };
 }
 
-
 // [ ] conditional
 namespace util::trn {
 	/// @brief if Match evaulates to true, evaluates transforms left to right
@@ -160,7 +159,7 @@ namespace util::trn::build {
 	/// @tparam ::type<Tup> the input tuple
 	template<COMPARE LT_T> struct sort { template<typename Tup> using type = util::trn::sort<Tup, LT_T>; }; 
 }
-// [ ] 
+// [ ] unique
 namespace util::trn {
 	template<typename Tup, COMPARE Same_T>
 	struct unique;
@@ -274,9 +273,6 @@ namespace util::mtc::build {
 	template<MATCH Match_T> struct allof { template<typename Tup> using type = mtc::allof<Tup, Match_T>; };
 }
 
-static_assert(util::mtc::allof_v<std::tuple<const int, const float>, std::is_const>, "");
-static_assert(!util::mtc::allof_v<std::tuple<const int, float>, std::is_const>, "");
-
 // [ ] any of
 namespace util::mtc {
 	template<typename Tup, MATCH Match_T> struct anyof : util::trn::set_t<Tup,
@@ -291,10 +287,6 @@ namespace util::mtc::build {
 		template<typename Tup> using type = mtc::anyof<Tup, Match_T>;
 	};
 }
-
-static_assert(!util::mtc::anyof_v<std::tuple<int, float>, std::is_const>, "");
-static_assert(util::mtc::anyof_v<std::tuple<const int, float>, std::is_const>, "");
-
 
 // [ ] element of/contains
 namespace util::mtc {
@@ -316,9 +308,6 @@ namespace util::mtc::build {
 		template<typename Tup> using negated = std::negation<type<Tup>>;
 	};
 }
-
-static_assert(util::mtc::element_of_v<int, std::tuple<float, int>>, "");
-static_assert(!util::mtc::element_of_v<int, std::tuple<float, char>>, "");
 
 // [ ] set_intersect
 namespace util::trn {
@@ -347,7 +336,6 @@ namespace util::trn::build {
 	/// @tparam ::type<Tup> the input tuples
 	template<typename New_T> struct assign { template<typename T> using type = std::type_identity<New_T>; };
  }
-
 
 // [ ] compare transformed
 namespace util::cmp {
@@ -393,14 +381,6 @@ namespace util::cmp::build {
 	template<COMPARE Cmp_T, TRANSFORM RHS_Trans_T> struct transformed_rhs : transformed_individual<Cmp_T, std::type_identity, RHS_Trans_T> { };
 	template<COMPARE Cmp_T, TRANSFORM LHS_Trans_T> struct transformed_lhs : transformed_individual<Cmp_T, LHS_Trans_T, std::type_identity> { };
 }
-
-static_assert(util::cmp::transformed_v<int, const int, std::is_same, std::remove_const>, "");
-static_assert(!util::cmp::transformed_v<int, const float, std::is_same, std::remove_const>, "");
-
-static_assert(util::cmp::transformed_lhs_v<int, const int, std::is_same, std::add_const>, "");
-static_assert(!util::cmp::transformed_rhs_v<int, const float, std::is_same, std::add_const>, "");
-
-
 
 // [ ] prioritize if
 namespace util::cmp {

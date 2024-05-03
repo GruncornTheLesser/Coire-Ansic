@@ -1,12 +1,11 @@
-#ifndef ECS_POOL_H
-#define ECS_POOL_H
+#pragma once
 
-#include <shared_mutex>
 #include "util/sparse_map.h"
 #include "util/next_pow2.h"
 #include "entity.h"
-#include "traits.h" 
+#include "traits.h"
 #include "util/type_name.h"
+#include <shared_mutex>
 #include <iostream>
 
 namespace ecs {
@@ -69,12 +68,11 @@ namespace ecs {
 						 + (std::is_const_v<Us> ? 8 : 2)) << ", "  ), ...); // const (+6)archetype<Ts...>(+n)::(+2)
 			std::cout << "\b\b}" << std::endl;
 			// TODO: finish me
-			// NOTE: can deadlock if needs to acquire new resource oopsies
-			// deferred -> 
-			
-			
-			// iterate through entity update list
-			// swap component at index 1 with component at index of entity at index 1
+			// NOTE: can deadlock if needs to acquire new resource oopsies, 
+			// sync() should be called from context with all sync_set
+			// could distinguish between 
+			// maybe include seperate filed for synchronization set when syncing a resource
+			// eg 
 		}
 	private:
 		resource_set data;
@@ -87,7 +85,6 @@ namespace ecs {
 	template<typename T>
 	using pool = util::trn::propergate_const_t<T, traits::get_pool>;
 }
-#endif
 
 
 			// entity pair

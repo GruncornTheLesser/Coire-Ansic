@@ -1,5 +1,4 @@
-#ifndef ECS_TRAITS_H
-#define ECS_TRAITS_H
+#pragma once
 #include <tuple>
 #include <type_traits>
 #include "util/tuple_util.h"
@@ -46,13 +45,25 @@ namespace ecs::traits {
 	DECL_HAS_ATTRIB_VALUE(lock_priority)
 	DECL_GET_ATTRIB_VALUE(lock_priority, float, 0.5f)
 
-	template<typename T, typename=std::void_t<>> struct is_resource;
+	template<typename T, typename=std::void_t<>> struct is_resource : std::false_type { };
+	template<typename T> struct is_resource<T, std::void_t<
+		decltype(std::declval<T>().acquire()),
+		decltype(std::declval<T>().release()),
+		decltype(std::declval<const T>().acquire()), 
+		decltype(std::declval<const T>().release())>> : std::true_type { };
 	template<typename T> concept resource_class = is_resource<T>::value;
 
-	template<typename T> struct is_component : std::negation<std::disjunction<ecs::traits::is_resource<T>, ecs::traits::has_resource_set<T>>> { }; 
+	template<typename T> struct is_component : std::negation<std::disjunction<
+		ecs::traits::is_resource<T>, ecs::traits::has_resource_set<T>>> { }; 
 	template<typename T> static constexpr bool is_component_v = is_component<T>::value;
 
-	template<typename T, typename Pip_T> struct is_accessible_resource;
+	template<typename T, typename Pip_T> struct is_accessible_resource : util::mtc::allof<
+		util::trn::propergate_const_each_t<T, ecs::traits::get_resource_set>,
+		util::mtc::build::element_of<ecs::traits::get_resource_set_t<Pip_T>,
+			util::cmp::build::disjunction<std::is_same,
+				util::cmp::build::transformed_rhs<std::is_same, std::add_const>::template type
+			>::template type
+		>::template type> { };
 	template<typename T, typename Pip_T> static constexpr bool is_accessible_resource_v = is_accessible_resource<T, Pip_T>::value; 
 	template<typename T, typename Pip_T> concept accessible_resource_class = is_accessible_resource<T, Pip_T>::value;
 
@@ -65,13 +76,18 @@ namespace ecs::traits {
 	DECL_GET_ATTRIB_TYPE(pool, typename default_pool<T>::type) // gets T::pool, defaults to archetype<T>
 
 	template<typename T> struct get_pool_index_storage { using type = typename get_pool_t<std::remove_const_t<T>>::index; };
-	template<typename T> using entity_index_t = typename get_pool_index_storage<T>::type;
+	template<typename T> using index_storage_t = typename get_pool_index_storage<T>::type;
 
 	template<typename T> struct get_pool_entity_storage { using type = typename get_pool_t<std::remove_const_t<T>>::entity; };
 	template<typename T> using entity_storage_t = typename get_pool_entity_storage<T>::type;
 	
 	template<typename T> struct get_pool_component_storage { using type = typename get_pool_t<std::remove_const_t<T>>::template comp<std::remove_const_t<T>>; };
-	template<typename T> using entity_component_t = typename get_pool_component_storage<T>::type;
+	template<typename T> using component_storage_t = typename get_pool_component_storage<T>::type;
 }
-#include "traits.tpp"
-#endif
+
+namespace ecs::traits {
+	
+
+	
+}
+
