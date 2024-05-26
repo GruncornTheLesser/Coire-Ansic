@@ -37,117 +37,201 @@ pool type-attribute which defines which pool stores this component. defaults to 
 pool: 
 */
 
+// TODO: pool view
+// a pool view would simplify the pool access and mean pipeline<...>().pool<T>() can return a coherent class
+// a pool view would basically be a pipeline but for a specific class. it could simplify the synchronization
+
+// TODO: sub-pipeline - I need a way to request further resources for synchronisation etc. This breaks the 
+// system for avoiding deadlocks. currently all resources are acquired in a standardised order in the pipeline. 
+// if I want to acquire further resources some of those might be resources that should've been acquired first 
+// before the first. 
+// add parent type to pipeline, eg ecs::pipeline<ecs::registry, Ts...>, ecs::pipeline<ecs::pipeline<T, Ts...>, Us...>
+// allows specific locking of only associated components
+// doesnt solve problem of 
+//		ecs::pipeline<ecs::registry, A, B, C> // acquires A, B, C
+//		ecs::pipeline<ecs::pipeline<ecs::registry, C>, A, B> // acquires C, tries to acquire A, B
+// dont allow acquiring resources out of scope, rely on lock_priority trait. problem - traits currently doesnt allow specify per resource
+
+// TODO: traits classes
+//		ecs::resource_traits<T>
+//			lock_priority = get_lock_priority_v<T>;
+//			resource_set = get_resource_set_t<T>;
+//			resource_container = get_resource_container_t<T>;
+//			
+//		ecs::component_traits<T>
+//			lock_priority
+//			pool
+//			index_storage
+//			entity_storage
+//			component_storage
+
+// TODO: resource_alias type - resource_alias would change the type stored in the registry, but not its ID, 
+// This could increase template compile time as less instances of templates would exist, eg pool<T>::entity -> entity_array
+// TODO: further: could change pool<T> to be a alias type for ecs::archetype<T...>
+// pool<T> is empty type with navigation types to entity, index, component storage which are also all aliases
+// that would simplify the call from ecs::pool<T>::comp<T> to ecs::pool<T>::comp
+// a bit simpler
+// might complicate references to resource, would become resource_alias_t<T> which would often be wrapped in a get_resource_set_t
+// would have to work out what to do with resource_set, resource_set<alias_T>, 
+// might be a bit silly for simply referencing a member of class
+
+
 #include "ecs/registry.h"
 #include "ecs/pipeline.h"
 #include "ecs/view.h"
 #include "ecs/pool.h"
+#include "ecs/util/paged_vector.h"
+//#include "ecs/util/sparse_map2.h"
+#include <vector>
+#include <unordered_map>
+
+#include <iostream>
+#include <cassert>
 
 struct A;
 struct B;
-struct A { int a; using pool = ecs::archetype<A, B>; };
-struct B { int b; using pool = ecs::archetype<A, B>; };
+struct A { int a; };
+struct B { int b; };
 
 struct C { };
 struct D { };
 struct E { };
 struct F { };
-#include "ecs/util/type_name.h"
-#include <vector>
-#include <iostream>
 
 namespace ecs2 {
-	struct at{ 
-		template<typename T> using resource_set = std::tuple<ecs::traits::index_storage_t<T>>; 
-		size_t index; 
-	};
-	struct back {
-		template<typename T> using resource_set = std::tuple<>;
-	};
-	struct front { 
-		template<typename T> using resource_set = std::tuple<>;
-	};
+	struct at { size_t index; };
+	struct back { };
+	struct front { };
 
-	struct deferred {
-		template<typename T> using resource_set = std::tuple<ecs::pool<T>>;
+	struct swap { };
+	struct ordered { };
+	struct replace { };
 
-		template<typename Pip_T, typename T, typename Ent_T, typename Pos_T, typename ... Arg_Ts>
-		auto emplace(Pip_T pip, Ent_T ent, Pos_T pos, Arg_Ts&& ... args);
+	struct deferred { };
+	struct immediate { };
 
-		template<typename Pip_T, typename T, typename Ent_T, typename ... Arg_Ts>
-		auto erase(Pip_T pip, Ent_T ent, Arg_Ts&& ... args);
-	};
-	struct immediate {
-		template<typename T> using resource_set = std::tuple<ecs::pool<T>>;
-
-		template<typename Pip_T, typename T, typename Ent_T, typename Pos_T, typename ... Arg_Ts>
-		auto emplace(Pip_T pip, Ent_T ent, Pos_T pos, Arg_Ts&& ... args);
-
-		template<typename Pip_T, typename T, typename Ent_T, typename ... Arg_Ts>
-		auto erase(Pip_T pip, Ent_T ent, Arg_Ts&& ... args);
-	};
+	// storage components
+	struct grouped { }; // maintain groups when emplacing and erasing
+	struct sorted { };  // maintain order when emplacing and erasing, insert into correct location when emplacing
 }
 
-namespace ecs2::traits {
-	template<typename T> struct is_position_arg : std::disjunction<std::is_same<T, back>, std::is_same<T, at>, std::is_same<T, front>> { };
 
-	template<typename T, typename What_T, typename=void> struct is_input_arg : std::is_same<T, What_T> { };
-	template<typename T, typename What_T> struct is_input_arg<T, What_T, std::void_t<
+
+/*
+namespace ecs2::traits {
+	template<typename T> struct is_position_arg : std::disjunction<
+		std::is_same<T, back>, 
+		std::is_same<T, at>, 
+		std::is_same<T, front>> { };
+
+	template<typename T, typename What_T, typename=void> struct is_argument_of : 
+		std::is_same<T, What_T> { };
+	template<typename T, typename What_T> struct is_argument_of<T, What_T, std::void_t<
 		decltype(std::begin(std::declval<T&>())), decltype(std::end(std::declval<T&>()))>> : 
-	std::conjunction<
+		std::conjunction<
 		std::is_same<std::remove_cvref_t<decltype(*std::begin(std::declval<T>()))>, What_T>, 
 		std::is_same<std::remove_cvref_t<decltype(*std::begin(std::declval<T>()))>, What_T>> { }; 
 	
-	template<typename T, typename=void> struct is_exection_arg : std::true_type { };
+	template<typename T, typename args_T>
+	struct argument_wrapper {
+		argument_wrapper(args_T& args): args(args) { }
+		template<typename func_T>
+		void for_each(func_T func) { std::for_each(args.begin(), args.end(), func); }
+		auto begin() { return args.begin(); }
+		auto end() { return args.end(); }
+		args_T& args;
+	};
 
-	template<typename T, typename What_T> concept input_arg_class = is_input_arg<T, What_T>::value;
+	template<typename arg_T>
+	struct argument_wrapper<arg_T, arg_T> { 
+		argument_wrapper(arg_T& arg): arg(arg) { }
+		template<typename func_T>
+		void for_each(func_T func) { func(arg); }
+		arg_T* begin() { return &arg; }
+		arg_T* end() { return ++(&arg); }
+		arg_T& arg;
+	};
+
+
+	template<typename T, typename=void> struct is_sequence_arg : std::true_type { };
+
+	template<typename T> struct is_order_arg : std::disjunction<std::is_same<T, ordered>, std::is_same<T, swap>, std::is_same<T, replace>> { };
+	
+	template<typename T, typename What_T> concept argument_of_class = is_argument_of<T, What_T>::value;
 	template<typename T> concept position_arg_class = is_position_arg<T>::value;
-	template<typename T> concept exection_arg_class = is_exection_arg<T>::value;
+	template<typename T> concept sequence_arg_class = is_sequence_arg<T>::value;
+	template<typename T> concept order_arg_class = is_order_arg<T>::value;
+}
+
+template<typename T,
+	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
+	ecs2::traits::order_arg_class OrderPolicy_T = ecs2::swap,
+	typename Pip_T, typename ... Arg_Ts>
+void emplace_at(Pip_T& pip, ecs::pool<T>::const_iterator pos, ecs::entity e, Arg_Ts&& ... args);
+
+template<typename T,
+	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
+	ecs2::traits::order_arg_class OrderPolicy_T = ecs2::swap,
+    
+	typename Pip_T, typename ... Arg_Ts>
+void emplace_at(Pip_T& pip, ecs::pool<T>::const_iterator pos, it first, it last, Arg_Ts&& ... args)
+
+template<typename T,
+	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
+	typename Pip_T>
+void swap(ecs::entity e1, ecs::entity e2) {
+
 }
 
 template<typename T, 
-	ecs2::traits::exection_arg_class exec_T = ecs2::immediate, 
-	ecs2::traits::input_arg_class<ecs::entity> ent_T = ecs::entity, 
-	ecs2::traits::position_arg_class pos_T = ecs2::back, 
-	typename ... Arg_Ts>
-void emplace_at(ent_T what, pos_T pos, Arg_Ts ... args) { }
-
-template<typename T, 
-	ecs2::traits::exection_arg_class exec_T = ecs2::immediate, 
-	ecs2::traits::input_arg_class<ecs::entity> ent_T = ecs::entity, 
-	typename ... Arg_Ts>
-void emplace(ent_T, Arg_Ts ... args) { }
-
+	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
+	ecs2::traits::argument_of_class<ecs::entity> ent_T = ecs::entity, 
+	typename Pip_T, typename ... Arg_Ts>
+void emplace(Pip_T& pip, ent_T ents, Arg_Ts&& ... args) {
+	
+}
+*/
 int main() {
-	ecs::entity e = 0;
-	std::vector<ecs::entity> e_arr;
+    
+	util::sparse_map<size_t> s_map;
+    std::unordered_map<size_t, size_t> u_map;
 
-	emplace_at<int>(e, ecs2::back{});
-	emplace_at<int>(e, ecs2::at(1), 0.0f);
-	emplace_at<int>(e, ecs2::front{});
-	emplace_at<int>(e, ecs2::front{});
-	emplace<int>(e);
-	emplace<int>(e);
-	emplace<int>(e_arr);
+    util::paged_vector<size_t> pv;
 
+
+
+
+	/*
 	ecs::registry reg;
 	auto pip = reg.pipeline<A, B, C>();
+	
+	ecs::entity e = 0;
+	std::vector<ecs::entity> e_arr;
+	emplace_at<A, ecs2::immediate, ecs2::swap>(pip, e, ecs2::back{});
+	emplace_at<A>(pip, e, ecs2::at{1}, 0.0f);
+	emplace_at<A>(pip, e, ecs2::front{});
+	emplace_at<A>(pip, e, ecs2::front{});
+	emplace<A>(pip, e);
+	emplace<A>(pip, e);
+	emplace<A>(pip, e_arr);
 
 	for (uint32_t i = 0; i < 12; ++i) {
-		pip.emplace<A, ecs::immediate>(ecs::entity{i}, i); 
+		pip.emplace<A, ecs::immediate>(ecs::entity{i}, i);
 		pip.emplace<B, ecs::immediate>(ecs::entity{i}, i);
 	}
 
 	auto view1 = reg.view<ecs::entity, A, const B>();
 	for (auto it = view1.rbegin(); it != view1.rend(); ++it) 
 	{
-		//auto [e, a, b] = *it;
-		//std::cout << e << ", " << a.a << ", " << b.b << std::endl;
+		auto [e, a, b] = *it;
+		std::cout << e << ", " << a.a << ", " << b.b << std::endl;
 	}
 
 	auto view2 = pip.view<ecs::entity, A, const B>();
 	for (auto [e, a, b] : view2) {
-		//std::cout << e << ", " << a.a << ", " << b.b << std::endl;
+		std::cout << e << ", " << a.a << ", " << b.b << std::endl;
 	}
+	*/
 }
 
 /*
@@ -155,34 +239,4 @@ registry -> stores resources objects
 pipeline -> manages resource_set acquire and release
 pool -> storage set of resource
 event -> has resource_set of required resources
-*/
-
-
-
-	/*
-	{
-		{ auto& [e, a] = *pip.pool<const A>().begin(); }
-		{ auto& [e, cd] = *pip.pool<const C>().begin(); }
-		{ auto& [e, f, g] = *pip.pool<const F>().begin(); }
-
-		{ auto& [e, a] = *pip.pool<A>().begin(); }
-		{ auto& [e, cd] = *pip.pool<C>().begin(); }
-		{ auto& [e, f, g] = *pip.pool<F>().begin(); }
-
-		{ auto [e, f, c] = *pip.view<F, C>().begin(); }
-
-		{ ecs::entity e = *pip.pool<A>().begin(); }
-		{ ecs::entity e = *pip.pool<C>().begin(); }
-		{ ecs::entity e = *pip.pool<F>().begin(); }
-		{ ecs::entity e = *pip.pool<const A>().begin(); }
-		{ ecs::entity e = *pip.pool<const C>().begin(); }
-		{ ecs::entity e = *pip.pool<const F>().begin(); }
-
-		{ A& a = *pip.pool<A>().begin(); }
-		{ C& c = *pip.pool<C>().begin(); }
-		{ F& f = *pip.pool<F>().begin(); }
-		{ const A& a = *pip.pool<const A>().begin(); }
-		{ const C& c = *pip.pool<const C>().begin(); }
-		{ const F& f = *pip.pool<const F>().begin(); }
-	}
 */

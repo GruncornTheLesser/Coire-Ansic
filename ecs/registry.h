@@ -65,15 +65,23 @@ T& ecs::registry::erased_ptr::get() {
 
 template<typename U, typename ... Arg_Us>
 U& ecs::registry::get_resource(Arg_Us ... args) {
-	// get resource position
-	std::type_index key = typeid(traits::get_resource_container_t<std::remove_const_t<U>>);
-	resource_data_t::iterator it = data.find(key);
-	if (it == data.end()) // if key not found
-		if constexpr (std::is_constructible_v<U, Arg_Us...>)
-			it = data.emplace_hint(it, key, new U{ std::forward<Arg_Us>(args)... });
-		else
-			throw std::runtime_error(std::string("registry does not contain data/could not construct '") + std::string(util::type_name<U>()) + "'");
-	return it->second.get<U>();
+	using container_U = traits::get_resource_container_t<U>;
+	
+	std::type_index key = typeid(container_U);
+	auto it = data.find(key);
+	
+	if (it == data.end()) {
+		if constexpr (!std::is_constructible_v<U, Arg_Us...>)
+			throw std::runtime_error(std::string("registry does not contain data/could not construct '") + 
+				std::string(util::type_name<U>()) + "'");
+		
+		it = data.emplace_hint(it, key, new U{ std::forward<Arg_Us>(args)... });
+	}
+
+	if constexpr (!util::cmp::transformed_v<U, container_U, std::is_same, std::remove_const>)
+		return it->second.get<U>();
+	else
+		return it->second.get<U>();
 }
 
 template<typename U>

@@ -57,7 +57,7 @@ namespace ecs {
 		using resource_set = std::tuple<select_T, from_T, where_T>;
 
 		using iterator = view_iterator<select_T, from_T, where_T, pip_T>;
-		using const_iterator = view_iterator<util::trn::each_t<select_T, std::add_const>, from_T, where_T, pip_T>;
+		using const_iterator = view_iterator<util::each_t<select_T, std::add_const>, from_T, where_T, pip_T>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -85,7 +85,7 @@ namespace ecs {
 		using iterator_category = std::random_access_iterator_tag;
 		using value_type = view_reference<select_T, from_T, pip_T>;
         using reference = view_reference<select_T, from_T, pip_T>;
-		using const_reference = view_reference<util::trn::each_t<select_T, std::add_const>, from_T, pip_T>;
+		using const_reference = view_reference<util::each_t<select_T, std::add_const>, from_T, pip_T>;
 		//using pointer = T*;
 		//using const_pointer = const T*;
 		using difference_type = std::ptrdiff_t;
@@ -160,15 +160,15 @@ struct std::tuple_element<N, const ecs::view_reference<select_T, from_T, pip_T>>
 
 template<typename ... Ts>
 struct ecs::select {
-	using resource_set = util::trn::each_t<util::trn::filter_t<std::tuple<Ts...>,
-		util::mtc::build::compare_to<ecs::entity, util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template negated>, 
-		util::trn::build::propergate_const<ecs::traits::get_pool_component_storage>::template type>;
+	using resource_set = util::each_t<util::filter_t<std::tuple<Ts...>,
+		util::build::compare_to<ecs::entity, util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template negated>, 
+		util::build::propergate_const<ecs::traits::get_pool_component_storage>::template type>;
 
 	// for each type in filtered for set of not empty
-	using retrieve_set = util::trn::each_t<util::trn::filter_t<std::tuple<Ts...>,
-			util::mtc::build::negation<std::is_empty>::type>, 
-			util::trn::build::conditional<
-				util::mtc::build::compare_to<
+	using retrieve_set = util::each_t<util::filter_t<std::tuple<Ts...>,
+			util::build::negation<std::is_empty>::type>, 
+			util::build::conditional<
+				util::build::compare_to<
 					ecs::entity, 
 					util::cmp::build::transformed<std::is_same, std::remove_cvref>::type
 				>::negated, // not equal to entity
@@ -184,7 +184,7 @@ struct ecs::from {
 
 template<typename ... Ts>
 struct ecs::where {
-	using resource_set = util::trn::concat_t<util::trn::each_t<std::tuple<Ts...>, traits::get_resource_set>>;
+	using resource_set = util::concat_t<util::each_t<std::tuple<Ts...>, traits::get_resource_set>>;
 
 	template<typename pip_T>
 	static bool check(pip_T& pip, ecs::entity ent) {
@@ -218,15 +218,15 @@ struct ecs::exclude {
 template<typename select_T>
 struct ecs::view_from_builder { 
 	using type = ecs::from<std::tuple_element_t<0, 
-		util::trn::filter_t<util::trn::rewrap_t<select_T, std::tuple>, 
-		util::mtc::build::compare_to<ecs::entity, std::is_same>::negated>>>;
+		util::filter_t<util::rewrap_t<select_T, std::tuple>, 
+		util::build::compare_to<ecs::entity, std::is_same>::negated>>>;
 };
 
 template<typename select_T, typename from_T>
 struct ecs::view_where_builder<select_T, ecs::from<from_T>> {
-	using type = ecs::where<util::trn::filter_t<util::trn::rewrap_t<select_T, ecs::include>, util::mtc::build::disjunction<
-		util::mtc::build::compare_to<from_T, util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type,
-		util::mtc::build::compare_to<ecs::entity, util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type
+	using type = ecs::where<util::filter_t<util::rewrap_t<select_T, ecs::include>, util::build::disjunction<
+		util::build::compare_to<from_T, util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type,
+		util::build::compare_to<ecs::entity, util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type
 		>::template negated>>;
 };
 
@@ -392,11 +392,11 @@ ecs::view_reference<select_T, from_T, pip_T>::get() {
 	else
 	{
 		if constexpr (std::is_same_v<traits::get_pool_t<type>, std::remove_cvref_t<typename from_T::pool>>)
-			return pip.template get_resource<util::trn::propergate_const_t<type, ecs::traits::get_pool_component_storage>>()[ind];
+			return pip.template get_resource<util::propergate_const_t<type, ecs::traits::get_pool_component_storage>>()[ind];
 		else 
 		{
 			size_t i = pip.template get_resource<ecs::traits::index_storage_t<type>>()[ent];
-			return pip.template get_resource<util::trn::propergate_const_t<type, ecs::traits::get_pool_component_storage>>()[i];
+			return pip.template get_resource<util::propergate_const_t<type, ecs::traits::get_pool_component_storage>>()[i];
 		}
 	}
 }

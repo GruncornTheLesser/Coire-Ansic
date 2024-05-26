@@ -3,6 +3,8 @@
 #include <type_traits>
 #include "util/tuple_util.h"
 
+// TODO: I dont think this should be done with macros I want to do to much specific stuff
+
 #define EXPAND(...) __VA_ARGS__
 #define DECL_HAS_ATTRIB_TYPE(NAME)\
 	template<typename T, typename=std::void_t<>> struct has_##NAME : std::false_type { };\
@@ -19,7 +21,7 @@
 	template <typename T> struct get_##NAME<T, std::enable_if_t<!has_##NAME##_v<T>>> { using type = std::tuple<T>; };\
 	template <typename T> struct get_##NAME<T, std::enable_if_t<has_##NAME##_v<T>>> { using type = typename get_##NAME<typename T::NAME>::type; };\
 	template<typename ... Ts> struct get_##NAME<std::tuple<Ts...>, std::enable_if_t<!has_##NAME##_v<std::tuple<Ts...>>>>\
-	{ using type = util::trn::concat_t<util::trn::each_t<std::tuple<Ts...>, get_##NAME>>; };\
+	{ using type = util::concat_t<util::each_t<std::tuple<Ts...>, get_##NAME>>; };\
 	template<typename T> using get_##NAME##_t = typename get_##NAME<T>::type;
 
 #define DECL_HAS_ATTRIB_VALUE(NAME)\
@@ -53,15 +55,12 @@ namespace ecs::traits {
 		decltype(std::declval<const T>().release())>> : std::true_type { };
 	template<typename T> concept resource_class = is_resource<T>::value;
 
-	template<typename T> struct is_component : std::negation<std::disjunction<
-		ecs::traits::is_resource<T>, ecs::traits::has_resource_set<T>>> { }; 
-	template<typename T> static constexpr bool is_component_v = is_component<T>::value;
-
-	template<typename T, typename Pip_T> struct is_accessible_resource : util::mtc::allof<
-		util::trn::propergate_const_each_t<T, ecs::traits::get_resource_set>,
-		util::mtc::build::element_of<ecs::traits::get_resource_set_t<Pip_T>,
-			util::cmp::build::disjunction<std::is_same,
-				util::cmp::build::transformed_rhs<std::is_same, std::add_const>::template type
+	template<typename T, typename Pip_T> struct is_accessible_resource : util::allof<
+		util::propergate_const_each_t<T, ecs::traits::get_resource_set>,
+			util::build::element_of<ecs::traits::get_resource_set_t<Pip_T>, 
+				util::cmp::build::disjunction<std::is_same,
+					util::cmp::build::transformed_rhs<std::is_same, std::add_const
+				>::template type
 			>::template type
 		>::template type> { };
 	template<typename T, typename Pip_T> static constexpr bool is_accessible_resource_v = is_accessible_resource<T, Pip_T>::value; 
@@ -83,6 +82,13 @@ namespace ecs::traits {
 	
 	template<typename T> struct get_pool_component_storage { using type = typename get_pool_t<std::remove_const_t<T>>::template comp<std::remove_const_t<T>>; };
 	template<typename T> using component_storage_t = typename get_pool_component_storage<T>::type;
+
+
+	template<typename T> struct is_component : std::negation<std::disjunction<
+		ecs::traits::is_resource<T>, 
+		ecs::traits::has_resource_set<T>>> { };
+	template<typename T> static constexpr bool is_component_v = is_component<T>::value;
+	template<typename T> concept component_class = is_component<T>::value;
 }
 
 namespace ecs::traits {
