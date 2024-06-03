@@ -352,10 +352,10 @@ namespace util::build {
 
 // [ ] element of/contains
 namespace util {
-	template<typename T, typename Tup, COMPARE Cmp_T = std::is_same>
-	struct element_of : anyof<Tup, build::compare_to<T, Cmp_T>::template type> { };
-	template<typename T, typename Tup, COMPARE Cmp_T = std::is_same>
-	static constexpr bool element_of_v = element_of<T, Tup, Cmp_T>::value;
+	template<typename T, typename Tup, COMPARE Same_T = std::is_same>
+	struct element_of : anyof<Tup, build::compare_to<T, Same_T>::template type> { };
+	template<typename T, typename Tup, COMPARE Same_T = std::is_same>
+	static constexpr bool element_of_v = element_of<T, Tup, Same_T>::value;
 }
 namespace util::build {
 	template<typename Tup, COMPARE Cmp_T = std::is_same>
@@ -439,7 +439,7 @@ namespace util::cmp::build {
 // [ ] prioritize if
 namespace util::cmp {
 	template<typename LHS_T, typename RHS_T, MATCH Match_T> struct prioritize_if : 
-		std::disjunction<std::negation<Match_T<LHS_T>>, Match_T<RHS_T>> { };
+		std::conjunction<Match_T<LHS_T>, std::negation<Match_T<RHS_T>>> { };
 	
 	template<typename LHS_T, typename RHS_T, MATCH Match_T> 
 	static constexpr bool prioritize_if_v = prioritize_if<LHS_T, RHS_T, Match_T>::value;

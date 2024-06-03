@@ -76,33 +76,48 @@ pool:
 // might be a bit silly for simply referencing a member of class
 
 
+// NEW PLAN:
+//	objects:
+//		keep registry
+//		keep pipeline
+//		keep view
+//		change pool resources -> currently pool resources are pool<T>::resource, instead I would prefer:
+//			indexer<T> = get_attrib<T, indexer>;
+//			storage<T> = get_attrib<T, storage>;
+//			handler<T> = get_attrib<T, handler>;
+//			dispatcher<T> = get_attrib<T, dispatcher>;
+//		add pool_view -> a pool view would be a subset of a pipeline without the resource acquisition
+//						 would be encoded with the resource_set and allow access to pool functions
+//						 I want this because all naming conventions are subject to a collection. 
+//						 by separating the pool into resoufces I have lost that understanding
+//	attributes:
+//		keep resource_set
+//		remove resource container -> provides no caching improvement given that its all stored in registry anyway
+//		remove synchronisation_set -> This was intended to work so when a resource is release it acquires the set of these resources to update itself
+//		add resource_alias -> changes the type stored for the given key, defaults to pool
+//		add resource_shared_set -> when this resource is registered -> shared set adds 
+//		add resource_syncer -> a tuple of on synchronization functors, replacing the sync func on the pipeline container
+//		
+//		
+
+
+
 #include "ecs/registry.h"
 #include "ecs/pipeline.h"
 #include "ecs/view.h"
 #include "ecs/pool.h"
 #include "ecs/util/paged_vector.h"
-//#include "ecs/util/sparse_map2.h"
-#include <vector>
-#include <unordered_map>
-
 #include <iostream>
 #include <cassert>
 
-struct A;
-struct B;
 struct A { int a; };
 struct B { int b; };
-
 struct C { };
 struct D { };
 struct E { };
 struct F { };
-
+/*
 namespace ecs2 {
-	struct at { size_t index; };
-	struct back { };
-	struct front { };
-
 	struct swap { };
 	struct ordered { };
 	struct replace { };
@@ -114,106 +129,46 @@ namespace ecs2 {
 	struct grouped { }; // maintain groups when emplacing and erasing
 	struct sorted { };  // maintain order when emplacing and erasing, insert into correct location when emplacing
 }
-
-
-
-/*
-namespace ecs2::traits {
-	template<typename T> struct is_position_arg : std::disjunction<
-		std::is_same<T, back>, 
-		std::is_same<T, at>, 
-		std::is_same<T, front>> { };
-
-	template<typename T, typename What_T, typename=void> struct is_argument_of : 
-		std::is_same<T, What_T> { };
-	template<typename T, typename What_T> struct is_argument_of<T, What_T, std::void_t<
-		decltype(std::begin(std::declval<T&>())), decltype(std::end(std::declval<T&>()))>> : 
-		std::conjunction<
-		std::is_same<std::remove_cvref_t<decltype(*std::begin(std::declval<T>()))>, What_T>, 
-		std::is_same<std::remove_cvref_t<decltype(*std::begin(std::declval<T>()))>, What_T>> { }; 
-	
-	template<typename T, typename args_T>
-	struct argument_wrapper {
-		argument_wrapper(args_T& args): args(args) { }
-		template<typename func_T>
-		void for_each(func_T func) { std::for_each(args.begin(), args.end(), func); }
-		auto begin() { return args.begin(); }
-		auto end() { return args.end(); }
-		args_T& args;
-	};
-
-	template<typename arg_T>
-	struct argument_wrapper<arg_T, arg_T> { 
-		argument_wrapper(arg_T& arg): arg(arg) { }
-		template<typename func_T>
-		void for_each(func_T func) { func(arg); }
-		arg_T* begin() { return &arg; }
-		arg_T* end() { return ++(&arg); }
-		arg_T& arg;
-	};
-
-
-	template<typename T, typename=void> struct is_sequence_arg : std::true_type { };
-
-	template<typename T> struct is_order_arg : std::disjunction<std::is_same<T, ordered>, std::is_same<T, swap>, std::is_same<T, replace>> { };
-	
-	template<typename T, typename What_T> concept argument_of_class = is_argument_of<T, What_T>::value;
-	template<typename T> concept position_arg_class = is_position_arg<T>::value;
-	template<typename T> concept sequence_arg_class = is_sequence_arg<T>::value;
-	template<typename T> concept order_arg_class = is_order_arg<T>::value;
-}
-
-template<typename T,
-	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
-	ecs2::traits::order_arg_class OrderPolicy_T = ecs2::swap,
-	typename Pip_T, typename ... Arg_Ts>
-void emplace_at(Pip_T& pip, ecs::pool<T>::const_iterator pos, ecs::entity e, Arg_Ts&& ... args);
-
-template<typename T,
-	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
-	ecs2::traits::order_arg_class OrderPolicy_T = ecs2::swap,
-    
-	typename Pip_T, typename ... Arg_Ts>
-void emplace_at(Pip_T& pip, ecs::pool<T>::const_iterator pos, it first, it last, Arg_Ts&& ... args)
-
-template<typename T,
-	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
-	typename Pip_T>
-void swap(ecs::entity e1, ecs::entity e2) {
-
-}
-
-template<typename T, 
-	ecs2::traits::sequence_arg_class seq_T = ecs2::immediate, 
-	ecs2::traits::argument_of_class<ecs::entity> ent_T = ecs::entity, 
-	typename Pip_T, typename ... Arg_Ts>
-void emplace(Pip_T& pip, ent_T ents, Arg_Ts&& ... args) {
-	
-}
 */
+struct res_A;
+struct res_C;
+struct res_D;
+
+struct res_A { };
+struct res_B { using resource_type = res_A; };
+struct res_C { using resource_alias = res_B; };
+struct res_D { using resource_alias = res_A; };
+
+static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_A>, res_A>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_A>, res_A>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_B>, res_B>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_B>, res_A>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_C>, res_B>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_C>, res_A>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_D>, res_A>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_D>, res_A>, "");
+
 int main() {
-    
-	util::sparse_map<size_t> s_map;
-    std::unordered_map<size_t, size_t> u_map;
-
-    util::paged_vector<size_t> pv;
-
-
-
-
-	/*
 	ecs::registry reg;
+	auto x = ecs::traits::is_resource_key<ecs::handler<A>>::value;
+	std::cout << util::type_name<ecs::pipeline_builder<A, B, C>::type>() << std::endl;
 	auto pip = reg.pipeline<A, B, C>();
 	
-	ecs::entity e = 0;
-	std::vector<ecs::entity> e_arr;
-	emplace_at<A, ecs2::immediate, ecs2::swap>(pip, e, ecs2::back{});
-	emplace_at<A>(pip, e, ecs2::at{1}, 0.0f);
-	emplace_at<A>(pip, e, ecs2::front{});
-	emplace_at<A>(pip, e, ecs2::front{});
-	emplace<A>(pip, e);
-	emplace<A>(pip, e);
-	emplace<A>(pip, e_arr);
+	res_A* r1 = &reg.get_resource<res_A>(); // default behaviour, unique resource of type T
+	res_A* r2 = &reg.get_resource<res_B>(); // resource_type=res_A, unique resource of type resource_type<T> 
+	res_A* r3 = &reg.get_resource<res_C>(); // resource_alias=res_B, shares resource with r2
+	res_A* r4 = &reg.get_resource<res_D>(); // resource_alias=res_A, shares resource with r1
+	
+	assert(r2 == r3); // resource_alias
+	assert(r1 == r4);
+
+	ecs::entity e;
+	pip.emplace_back<A>(e);
+	pip.erase<A>(e);
+	
+	/*
+
+	
 
 	for (uint32_t i = 0; i < 12; ++i) {
 		pip.emplace<A, ecs::immediate>(ecs::entity{i}, i);
@@ -234,9 +189,3 @@ int main() {
 	*/
 }
 
-/*
-registry -> stores resources objects
-pipeline -> manages resource_set acquire and release
-pool -> storage set of resource
-event -> has resource_set of required resources
-*/

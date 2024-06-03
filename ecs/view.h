@@ -162,7 +162,7 @@ template<typename ... Ts>
 struct ecs::select {
 	using resource_set = util::each_t<util::filter_t<std::tuple<Ts...>,
 		util::build::compare_to<ecs::entity, util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template negated>, 
-		util::build::propergate_const<ecs::traits::get_pool_component_storage>::template type>;
+		util::build::propergate_const<util::build::wrap<storage>::template type>::template type>;
 
 	// for each type in filtered for set of not empty
 	using retrieve_set = util::each_t<util::filter_t<std::tuple<Ts...>,
@@ -178,8 +178,10 @@ struct ecs::select {
 
 template<typename T>
 struct ecs::from {
-	using pool = traits::get_pool_t<T>;
-	using resource_set = std::tuple<const typename traits::get_pool_t<T>::entity>;
+	using resource_set = std::tuple<const handler<T>>;
+
+	template<typename U>
+	static constexpr bool indexable() { return std::is_same_v<ecs::traits::get_resource_alias_t<U>, ecs::traits::get_resource_alias_t<T>>; }
 };
 
 template<typename ... Ts>
@@ -194,21 +196,21 @@ struct ecs::where {
 
 template<typename ... Ts>
 struct ecs::include {
-	using resource_set = std::tuple<typename pool<Ts>::index...>;
+	using resource_set = std::tuple<const indexer<Ts>...>;
 
 	template<typename pip_T>
 	static bool check(pip_T& pip, ecs::entity ent) {
-		return (pip.template get_resource<typename pool<Ts>::index>().contains(ent) && ...);
+		return (pip.template get_resource<const indexer<Ts>>().contains(ent) && ...);
 	}
 };
 
 template<typename ... Ts>
 struct ecs::exclude {
-	using resource_set = std::tuple<typename pool<Ts>::index...>;
+	using resource_set = std::tuple<const indexer<Ts>...>;
 
 	template<typename pip_T>
 	static bool check(pip_T& pip, ecs::entity ent) {
-		return !(pip.template get_resource<pool<Ts>::index>().contains(ent) || ...);
+		return !(pip.template get_resource<const indexer<Ts>>().contains(ent) || ...);
 	}
 };
 #pragma endregion
@@ -391,12 +393,12 @@ ecs::view_reference<select_T, from_T, pip_T>::get() {
 		return ent;
 	else
 	{
-		if constexpr (std::is_same_v<traits::get_pool_t<type>, std::remove_cvref_t<typename from_T::pool>>)
-			return pip.template get_resource<util::propergate_const_t<type, ecs::traits::get_pool_component_storage>>()[ind];
+		if constexpr (from_T::template indexable<type>())
+			return pip.template get_resource<util::propergate_const_t<type, util::build::wrap<storage>::template type>>()[ind];
 		else 
 		{
-			size_t i = pip.template get_resource<ecs::traits::index_storage_t<type>>()[ent];
-			return pip.template get_resource<util::propergate_const_t<type, ecs::traits::get_pool_component_storage>>()[i];
+			size_t i = pip.template get_resource<indexer<type>>()[ent];
+			return pip.template get_resource<util::propergate_const_t<type, util::build::wrap<storage>::template type>>()[i];
 		}
 	}
 }
@@ -411,15 +413,15 @@ ecs::view_reference<select_T, from_T, pip_T>::get() const {
 		return ent;
 	else
 	{
-		using index_lookup_t = typename traits::get_pool_t<type>::index;
-		using comp_array_t = traits::get_pool_t<type>::template comp<type>;
-
-		if constexpr (std::is_same_v<traits::get_pool_t<type>, std::remove_cvref_t<typename from_T::pool>>)
-			return pip.template get_resource<comp_array_t>()[ind];
+		using indexer = traits::get_indexer_t<type>;
+		using storage = traits::get_storage_t<type>;
+		using handler = traits::get_handler_t<type>;
+		if constexpr (from_T::template indexable<type>())
+			return pip.template get_resource<storage>()[ind];
 		else 
 		{
-			size_t i = pip.template get_resource<index_lookup_t>()[ent];
-			return pip.template get_resource<comp_array_t>()[i];
+			size_t i = pip.template get_resource<indexer>()[ent];
+			return pip.template get_resource<storage>()[i];
 		}
 	}
 }

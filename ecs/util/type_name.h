@@ -24,6 +24,10 @@ namespace util { // NOTE: when changing the namespace of this func you must upda
 
 	template<typename LHS_T, typename RHS_T> 
 	struct alpha_lt : std::bool_constant<util::type_name<LHS_T>() < util::type_name<RHS_T>()> { };
+
+	template<typename T> constexpr uint64_t type_hash() {
+		return std::hash<std::basic_string_view<char>>{}(type_name<T>());
+	};
 }
 
 #undef PF_CMD
