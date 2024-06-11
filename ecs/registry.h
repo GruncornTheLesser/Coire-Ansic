@@ -5,16 +5,16 @@
 #include <memory>
 
 #include "traits.h"
+#include "resource.h"
 #include "view.h" 
 #include "pipeline.h"
 #include "util/erased_ptr.h"
 
-#include "pool.h"
 namespace ecs {
 	class registry {
 	public:
 		template<typename T, typename ... Args>
-		ecs::traits::get_resource_type_t<T>& get_resource(Args ... args);
+		ecs::traits::get_resource_type_t<T>& get_resource(Args&& ... args);
 
 		template<typename T>
 		void erase_resource();
@@ -34,9 +34,9 @@ namespace ecs {
 
 
 template<typename T, typename ... Args>
-ecs::traits::get_resource_type_t<T>& ecs::registry::get_resource(Args ... args) {
-	using res_type = ecs::traits::get_resource_type_t<T>;
-	using alias_type = ecs::traits::get_resource_alias_t<T>;
+ecs::traits::get_resource_type_t<T>& ecs::registry::get_resource(Args&& ... args) {
+	using res_type = ecs::traits::get_resource_type_t<std::remove_const_t<T>>;
+	using alias_type = ecs::traits::get_resource_alias_t<std::remove_const_t<T>>;
 	std::type_index key = typeid(alias_type);
 	auto it = data.find(key);
 	
@@ -44,8 +44,9 @@ ecs::traits::get_resource_type_t<T>& ecs::registry::get_resource(Args ... args) 
 		if constexpr (std::is_constructible_v<T, Args...>)
 			it = data.emplace_hint(it, key, new res_type{ std::forward<Args>(args)... });
 		else
-			throw std::runtime_error(std::string("registry does not contain resource/could not construct '")
-			 + std::string(util::type_name<T>()) + "' from args '" + (std::string(util::type_name<Args>()) + ...)  + "'.");
+			throw "";
+			//throw std::runtime_error(std::string("registry does not contain resource/could not construct '")
+			// + std::string(util::type_name<T>()) + "' from args '" + (std::string(util::type_name<Args>()) + ...)  + "'.");
 	}
 	return it->second.get<res_type>();
 }

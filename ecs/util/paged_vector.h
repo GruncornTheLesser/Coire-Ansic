@@ -7,17 +7,17 @@
 
 
 namespace util {
-	template<typename T> class paged_vector;
-	template<typename T> class paged_vector_iterator;
+	// TODO: allocator parameter for paged_vector
+	template<typename T, size_t page_size=4096> class paged_vector;
+	template<typename T, size_t page_size=4096> class paged_vector_iterator;
 
-	template<typename T>
+	template<typename T, size_t page_size>
 	class paged_vector {	
 	private:
 		using page = T*;
 		using alloc_t = std::allocator<T>;
 
 	public:
-		static constexpr size_t page_size = 4096;
 		using reference = T&;
 		using const_reference = const T&;
 		using iterator = paged_vector_iterator<T>;
@@ -174,7 +174,6 @@ namespace util {
 		{ 
 			return iterator{ 0, pages }; 
 		}
-
 		iterator end() 
 		{ 
 			return { count, pages };
@@ -187,7 +186,6 @@ namespace util {
 		{ 
 			return iterator{ count, pages }; 
 		}
-		
 		reverse_iterator rbegin() 
 		{ 
 			return iterator{ count - 1, pages }; 
@@ -200,7 +198,6 @@ namespace util {
 		{ 
 			return const_iterator{ count - 1, pages }; 
 		}
-		
 		reverse_iterator rend() 
 		{ 
 			return { -1, pages }; 
@@ -271,7 +268,6 @@ namespace util {
 			std::destroy_n(begin(), count);
 			count = 0;
 		}
-		
 		template<typename ... Arg_Ts>
 		iterator emplace(const_iterator pos, Arg_Ts&&... args) 
 		{ 
@@ -289,7 +285,6 @@ namespace util {
 			std::construct_at<T>(&back(), std::forward<Arg_Ts>(args)...);
 			return back();
 		}
-
 		iterator insert(const_iterator pos, const T& value) 
 		{ 
 			return emplace(pos, value);
@@ -332,7 +327,6 @@ namespace util {
 		{ 
 			return insert(pos, ilist.begin(), ilist.end());
 		}
-		
 		iterator erase(const_iterator pos)
 		{
 			iterator it1 = begin() + (pos - cbegin());
@@ -356,7 +350,6 @@ namespace util {
 			count -= n;
 			return it1;
 		}
-
 		void push_back(const T& value) 
 		{ 
 			size_t index = count; 
@@ -371,13 +364,11 @@ namespace util {
 			size_t page_index = page_count - 1;
 			pages[index / page_size][index % page_size] = std::move(value);
 		}
-		
 		void pop_back()
 		{
 			std::destroy_at(&back());
 			--count;
 		}
-
 		void resize(size_t n) 
 		{
 			reserve(n);
@@ -412,7 +403,7 @@ namespace util {
 		page* pages;
 	};
 
-	template<typename T>
+	template<typename T, size_t page_size>
 	class paged_vector_iterator {
 	public:
 		
@@ -429,11 +420,14 @@ namespace util {
 
 		paged_vector_iterator(size_t index, data_type pages) : index(index), pages(pages) { }
 		
-		operator paged_vector_iterator<const T>() const { return paged_vector_iterator<const T>{ index, pages }; }
+		operator paged_vector_iterator<const T>() const 
+		{ 
+			return paged_vector_iterator<const T>{ index, pages }; 
+		}
 
 		reference operator*()
 		{ 
-			return pages[index / container_type::page_size][index % container_type::page_size]; 
+			return pages[index / page_size][index % page_size]; 
 		}
 		
 		paged_vector_iterator<T>& operator++()

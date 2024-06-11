@@ -1,11 +1,22 @@
-#include "view.h" 
-// pipeline requires view.h but view.tpp requires pipeline.h
-// this is probably bad
-
+#include "view.h"
 #pragma once
 #include "util/tuple_util.h"
 #include "util/type_name.h"
 #include "traits.h"
+#include "pool_traits.h"
+
+namespace ecs::traits {
+	template<typename T, typename Pip_T> struct is_accessible_resource;
+	template<typename T, typename Pip_T> static constexpr bool is_accessible_resource_v = is_accessible_resource<T, Pip_T>::value; 
+	template<typename T, typename Pip_T> concept accessible_resource_class = is_accessible_resource<T, Pip_T>::value;
+	template<typename T, typename Pip_T> struct is_accessible_resource : util::allof<
+		util::propergate_const_each_t<T, ecs::traits::get_resource_set>,
+			util::element_of_<ecs::traits::get_resource_set_t<Pip_T>, 
+				util::cmp::disjunction_<std::is_same,
+					util::cmp::transformed_rhs_<std::is_same, std::add_const>::template type
+				>::template type
+		>::template type> { };
+}
 
 namespace ecs {
 	template<ecs::traits::resource_key_class ... Ts>
@@ -13,58 +24,72 @@ namespace ecs {
 	{
 		// the set of resources locked by this pipeline
 		using resource_set = std::tuple<Ts...>;
+		template<typename T>
+		using pool_set_t = util::filter_t<resource_set, util::match::transformed_<
+				util::compare_to_<T, std::is_same>::template type, 
+				util::unwrap>::template type>;
+		template<typename T>
+		using get_resource_t = util::find_t<resource_set, util::match::disjunction_<
+			util::compare_to_<T, std::is_same>::template type, // const, const || mut, mut
+			util::compare_to_<T, std::is_same, std::add_const>::template type // cpnst, const || const, mut
+			>::template type>;
+		
+		template<typename T> using const_iterator = handler<T>::const_iterator;
+		template<typename T> using iterator = handler<T>::iterator;
+
 		// the set of pointers to containers required for all resource set
-		using data_set = std::tuple<ecs::traits::get_resource_type_t<Ts>&...>;
+		using data_set_t = std::tuple<ecs::traits::get_resource_type_t<Ts>&...>;
 
 		template<typename base_T>
 		pipeline_t(base_T& base);
 
+		// TODO: a pipeline could be copied if it only has const references???
 		pipeline_t(pipeline_t<Ts...>& other) = delete;
-		pipeline_t(pipeline_t<Ts...>&& other);
-
 		pipeline_t& operator=(pipeline_t<Ts...>& other) = delete;
+		
+		pipeline_t(pipeline_t<Ts...>&& other);
 		pipeline_t& operator=(pipeline_t<Ts...>&& other);
 
 		void lock();
 		void unlock();
 		void sync();
 
-		template<typename T>
-		using const_iterator = uint32_t; // TODO: set up pipeline const iterators -> probably make this a template arg for handler<T>::iterator
-
-		template<ecs::traits::component_class T,
-			ecs::traits::sequence_policy_class seq_T = ecs::traits::get_sequence_policy_t<T>,
-			ecs::traits::order_policy_class ord_T = ecs::traits::get_order_policy_t<T>,
-			typename ... Arg_Ts> 
-		//requires (is_accessible_resource_v<template ord_T::emplacer<T>, pipeline_t<Ts...>> && is_accessible_resource_v<Seq_T, pipeline_t<Ts...>>)
-		void emplace(const_iterator<T> pos, ecs::entity e, Arg_Ts&& ... args);
-
-		template<ecs::traits::component_class T,
-			ecs::traits::sequence_policy_class seq_T = ecs::traits::get_sequence_policy_t<T>,
-			ecs::traits::order_policy_class ord_T = ecs::traits::get_order_policy_t<T>,
-			std::input_iterator InputIt_T, typename ... Arg_Ts>
-		void emplace(const_iterator<T> pos, InputIt_T first, InputIt_T last, Arg_Ts&& ... args);
-
-		template<ecs::traits::component_class T, 
-			ecs::traits::sequence_policy_class seq_T = ecs::traits::get_sequence_policy_t<T>,
-			ecs::traits::order_policy_class ord_T = ecs::traits::get_order_policy_t<T>,
+		template<ecs::traits::component_class comp_T,
+			sequence_policy seq = ecs::traits::get_sequence_policy_v<comp_T>,
+			execution_policy exec = ecs::traits::get_execution_policy_v<comp_T>,
 			typename ... Arg_Ts>
-		void emplace_back(ecs::entity ents, Arg_Ts&& ... args);
+		void emplace(const_iterator<comp_T> pos, ecs::entity e, Arg_Ts&& ... args) {
+			// get handler
+			// exec sequence->emplace
+			// queue sync by execution_policy
+		}
 
-		template<ecs::traits::component_class T, 
-			ecs::traits::sequence_policy_class seq_T = ecs::traits::get_sequence_policy_t<T>,
-			ecs::traits::order_policy_class ord_T = ecs::traits::get_order_policy_t<T>,
+		template<ecs::traits::component_class comp_T,
+			sequence_policy seq = ecs::traits::get_sequence_policy_v<comp_T>,
+			execution_policy exec = ecs::traits::get_execution_policy_v<comp_T>,
+			std::input_iterator InputIt_T, typename ... Arg_Ts>
+		iterator<comp_T> emplace(const_iterator<comp_T> pos, InputIt_T first, InputIt_T last, Arg_Ts&& ... args);
+
+		template<ecs::traits::component_class comp_T, 
+			sequence_policy seq = ecs::traits::get_sequence_policy_v<comp_T>,
+			execution_policy exec = ecs::traits::get_execution_policy_v<comp_T>,
+			typename ... Arg_Ts>
+		comp_T& emplace_back(ecs::entity ents, Arg_Ts&& ... args);
+
+		template<ecs::traits::component_class comp_T, 
+			sequence_policy seq = ecs::traits::get_sequence_policy_v<comp_T>,
+			execution_policy exec = ecs::traits::get_execution_policy_v<comp_T>,
 			std::input_iterator InputIt_T, typename ... Arg_Ts>
 		void emplace_back(InputIt_T first, InputIt_T last, Arg_Ts&& ... args);
 
-		template<ecs::traits::component_class T,
-			ecs::traits::sequence_policy_class seq_T = ecs::traits::get_sequence_policy_t<T>,
-			ecs::traits::order_policy_class ord_T = ecs::traits::get_order_policy_t<T>> 
+		template<ecs::traits::component_class comp_T,
+			sequence_policy seq = ecs::traits::get_sequence_policy_v<comp_T>,
+			execution_policy exec = ecs::traits::get_execution_policy_v<comp_T>> 
 		void erase(ecs::entity e);
 
-		template<ecs::traits::component_class T, 
-			ecs::traits::sequence_policy_class seq_T = ecs::traits::get_sequence_policy_t<T>, 
-			ecs::traits::order_policy_class ord_T = ecs::traits::get_order_policy_t<T>, 
+		template<ecs::traits::component_class comp_T, 
+			sequence_policy seq = ecs::traits::get_sequence_policy_v<comp_T>, 
+			execution_policy exec = ecs::traits::get_execution_policy_v<comp_T>, 
 			std::input_iterator InputIt_T> 
 		void erase(InputIt_T first, InputIt_T last);
 
@@ -74,10 +99,10 @@ namespace ecs {
 			requires (traits::is_accessible_resource_v<std::tuple<ecs::select<select_Us...>, from_T, where_T>, pipeline_t<Ts...>>)
 		view<select<select_Us...>, from_T, where_T, pipeline_t<Ts...>&> view(from_T from = {}, where_T where = {});
 		
-		template<traits::accessible_resource_class<pipeline_t<Ts...>> U>
-		U& get_resource();
+		template<traits::accessible_resource_class<pipeline_t<Ts...>> res_T>
+		res_T& get_resource();
 	private:
-		data_set set;
+		data_set_t set;
 	};
 
 	// gathers and manipulates the set and order of required resources, to maintain consistent locking order and prevent deadlocks
@@ -91,21 +116,27 @@ namespace ecs {
 template<typename ... Ts>
 struct ecs::pipeline_builder
 {
-	using type = util::set_t<std::tuple<Ts...>, 
-		util::build::each< // for each T
-			util::build::propergate_const_each< // if const, add const to each element in tuple
-				util::build::set<
+	using type = util::eval_t<std::tuple<Ts...>, 
+		util::eval_each_< // for each T
+			util::propergate_const_each_< // if const, add const to each element in tuple
+				util::eval_<
 					std::remove_const,
-					util::build::conditional<ecs::traits::is_component, ecs::traits::get_pool_resource_set>::template type,// if component, ie not resource get poolset -> indexer<T>, handler<T>, storage<T>
+					util::conditional_<ecs::traits::is_component, // // if component, ie not resource 
+						ecs::traits::get_pool_resource_set>::template type, // get poolset -> indexer<T>, handler<T>, storage<T>
 					ecs::traits::get_resource_set
 				>::template type 
 			>::template type // end transform post conditional
 		>::template type, // end transform each
-		util::build::concat::template type, // concat resource sets together
-		util::build::sort<util::alpha_lt>::template type, // sort types by name
-		util::build::sort<util::cmp::build::prioritize_if<std::is_const>::template negated>::template type, // sort type by const
-		util::build::unique<util::cmp::build::transformed<std::is_same, std::remove_const>::template type>::template type, // remove duplicates
-		util::build::rewrap<ecs::pipeline_t>::template type
+		util::concat, // concat resource sets together
+		util::sort_<
+			util::cmp::priority_list_<
+				util::cmp::less_<std::is_const>::template type,
+				util::cmp::less_<traits::get_lock_priority>::template type,
+				util::cmp::less_<util::get_type_name>::template type
+			>::template type
+		>::template type,
+		util::unique_<util::cmp::transformed_<std::is_same, std::remove_const>::template type>::template type, // remove duplicates
+		util::rewrap_<ecs::pipeline_t>::template type
 	>;
 };
 
@@ -114,7 +145,7 @@ struct ecs::pipeline_builder
 template<ecs::traits::resource_key_class ... Ts>
 template<typename base_T> 
 ecs::pipeline_t<Ts...>::pipeline_t(base_T& base)
-	: set(base.template get_resource<Ts>()...) 
+	: set(base.template get_resource<Ts>()...)
 { }
 
 template<ecs::traits::resource_key_class ... Ts>
@@ -139,49 +170,9 @@ void ecs::pipeline_t<Ts...>::unlock() {
 }
 
 template<ecs::traits::resource_key_class ... Ts>
-template<ecs::traits::component_class T,
-	ecs::traits::sequence_policy_class seq_T,
-	ecs::traits::order_policy_class ord_T,
-	std::input_iterator InputIt_T, typename ... Arg_Ts>
-void ecs::pipeline_t<Ts...>::emplace(const_iterator<T> pos, InputIt_T first, InputIt_T last, Arg_Ts&& ... args) {
-
-}
-
-template<ecs::traits::resource_key_class ... Ts>
-template<ecs::traits::component_class T, 
-	ecs::traits::sequence_policy_class seq_T,
-	ecs::traits::order_policy_class ord_T,
-	typename ... Arg_Ts>
-void ecs::pipeline_t<Ts...>::emplace_back(ecs::entity ents, Arg_Ts&& ... args) {
-
-}
-
-template<ecs::traits::resource_key_class ... Ts>
-template<ecs::traits::component_class T, 
-	ecs::traits::sequence_policy_class seq_T,
-	ecs::traits::order_policy_class ord_T,
-	std::input_iterator InputIt_T, typename ... Arg_Ts>
-void ecs::pipeline_t<Ts...>::emplace_back(InputIt_T first, InputIt_T last, Arg_Ts&& ... args) {
-	
-}
-
-template<ecs::traits::resource_key_class ... Ts>
-template<ecs::traits::component_class T,
-			ecs::traits::sequence_policy_class seq_T,
-			ecs::traits::order_policy_class ord_T>
-void ecs::pipeline_t<Ts...>::erase(ecs::entity e) { }
-
-template<ecs::traits::resource_key_class ... Ts>
-template<ecs::traits::component_class T, 
-	ecs::traits::sequence_policy_class seq_T, 
-	ecs::traits::order_policy_class ord_T, 
-	std::input_iterator InputIt_T> 
-void ecs::pipeline_t<Ts...>::erase(InputIt_T first, InputIt_T last) { }
-
-template<ecs::traits::resource_key_class ... Ts>
-template<ecs::traits::accessible_resource_class<ecs::pipeline_t<Ts...>> U>
-U& ecs::pipeline_t<Ts...>::get_resource() {
-		return *std::get<U*>(set);
+template<ecs::traits::accessible_resource_class<ecs::pipeline_t<Ts...>> res_T>
+res_T& ecs::pipeline_t<Ts...>::get_resource() {
+	return std::get<std::remove_cvref_t<res_T>&>(set);
 }
 
 template<ecs::traits::resource_key_class ... Ts>

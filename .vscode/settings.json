@@ -86,5 +86,7 @@
 		"*.tpp": "cpp",
 		"compare": "cpp"
 	},
+	"todo-tree.tree.showCountsInTree": false,
+	"todo-tree.tree.showBadges": true,
 	//"C_Cpp.default.compilerPath": "C:\\Program Files (x86)\\MSYS\\mingw64\\bin\\g++.exe",
 }

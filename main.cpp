@@ -40,6 +40,7 @@ pool:
 // TODO: pool view
 // a pool view would simplify the pool access and mean pipeline<...>().pool<T>() can return a coherent class
 // a pool view would basically be a pipeline but for a specific class. it could simplify the synchronization
+// a pool view could kind also just be a view class alias
 
 // TODO: sub-pipeline - I need a way to request further resources for synchronisation etc. This breaks the 
 // system for avoiding deadlocks. currently all resources are acquired in a standardised order in the pipeline. 
@@ -52,31 +53,7 @@ pool:
 //		ecs::pipeline<ecs::pipeline<ecs::registry, C>, A, B> // acquires C, tries to acquire A, B
 // dont allow acquiring resources out of scope, rely on lock_priority trait. problem - traits currently doesnt allow specify per resource
 
-// TODO: traits classes
-//		ecs::resource_traits<T>
-//			lock_priority = get_lock_priority_v<T>;
-//			resource_set = get_resource_set_t<T>;
-//			resource_container = get_resource_container_t<T>;
-//			
-//		ecs::component_traits<T>
-//			lock_priority
-//			pool
-//			index_storage
-//			entity_storage
-//			component_storage
-
-// TODO: resource_alias type - resource_alias would change the type stored in the registry, but not its ID, 
-// This could increase template compile time as less instances of templates would exist, eg pool<T>::entity -> entity_array
-// TODO: further: could change pool<T> to be a alias type for ecs::archetype<T...>
-// pool<T> is empty type with navigation types to entity, index, component storage which are also all aliases
-// that would simplify the call from ecs::pool<T>::comp<T> to ecs::pool<T>::comp
-// a bit simpler
-// might complicate references to resource, would become resource_alias_t<T> which would often be wrapped in a get_resource_set_t
-// would have to work out what to do with resource_set, resource_set<alias_T>, 
-// might be a bit silly for simply referencing a member of class
-
-
-// NEW PLAN:
+// TODO: NEW PLAN:
 //	objects:
 //		keep registry
 //		keep pipeline
@@ -105,66 +82,61 @@ pool:
 #include "ecs/registry.h"
 #include "ecs/pipeline.h"
 #include "ecs/view.h"
-#include "ecs/pool.h"
 #include "ecs/util/paged_vector.h"
 #include <iostream>
 #include <cassert>
-
+#include "ecs/handler.h"
 struct A { int a; };
 struct B { int b; };
-struct C { };
+struct C { int c; };
 struct D { };
 struct E { };
 struct F { };
-/*
-namespace ecs2 {
-	struct swap { };
-	struct ordered { };
-	struct replace { };
 
-	struct deferred { };
-	struct immediate { };
-
-	// storage components
-	struct grouped { }; // maintain groups when emplacing and erasing
-	struct sorted { };  // maintain order when emplacing and erasing, insert into correct location when emplacing
-}
-*/
 struct res_A;
+struct res_B;
 struct res_C;
 struct res_D;
 
-struct res_A { };
+struct res_A { using resource_set = std::tuple<res_A, res_B, res_C, res_D>; };
+// res_A is requesting itself -> causes get_resource_set to break
+// res_A::resource_set = tuple<res_A, ...>
+// res_A::resource_set
 struct res_B { using resource_type = res_A; };
-struct res_C { using resource_alias = res_B; };
-struct res_D { using resource_alias = res_A; };
+struct res_C { using resource_alias = res_A; };
+struct res_D { using resource_alias = res_B; };
+struct res_E { };
+struct res_F { using resource_alias = res_E; };
+struct res_G { using resource_set = std::tuple<res_E>; };
+struct res_H { using resource_set = std::tuple<res_A, res_G>; };
 
 static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_A>, res_A>, "");
 static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_A>, res_A>, "");
 static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_B>, res_B>, "");
 static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_B>, res_A>, "");
-static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_C>, res_B>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_C>, res_A>, "");
 static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_C>, res_A>, "");
-static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_D>, res_A>, "");
+static_assert(std::is_same_v<ecs::traits::get_resource_alias_t<res_D>, res_B>, "");
 static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_D>, res_A>, "");
+
 
 int main() {
 	ecs::registry reg;
-	auto x = ecs::traits::is_resource_key<ecs::handler<A>>::value;
-	std::cout << util::type_name<ecs::pipeline_builder<A, B, C>::type>() << std::endl;
-	auto pip = reg.pipeline<A, B, C>();
-	
 	res_A* r1 = &reg.get_resource<res_A>(); // default behaviour, unique resource of type T
 	res_A* r2 = &reg.get_resource<res_B>(); // resource_type=res_A, unique resource of type resource_type<T> 
 	res_A* r3 = &reg.get_resource<res_C>(); // resource_alias=res_B, shares resource with r2
 	res_A* r4 = &reg.get_resource<res_D>(); // resource_alias=res_A, shares resource with r1
 	
-	assert(r2 == r3); // resource_alias
-	assert(r1 == r4);
-
-	ecs::entity e;
-	pip.emplace_back<A>(e);
-	pip.erase<A>(e);
+	assert(r1 == r3); // res_C is a resource_alias for res_A
+	assert(r2 == r4); // res_D is a resource_alias for res_B
+	
+	ecs::entity e = 0;
+	auto pip = reg.pipeline<A, B, C>();
+	auto v1 = pip.view<A, B, C>();
+	for (auto [a, b, c] : v1) { }
+	
+	//pip.template emplace_back<A>(e);
+	//pip.template erase<A>(e);
 	
 	/*
 
