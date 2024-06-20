@@ -36,12 +36,11 @@ component:
 pool type-attribute which defines which pool stores this component. defaults to pool archetype<T>
 pool: 
 */
-
-// TODO: pool view
-// a pool view would simplify the pool access and mean pipeline<...>().pool<T>() can return a coherent class
-// a pool view would basically be a pipeline but for a specific class. it could simplify the synchronization
-// a pool view could kind also just be a view class alias
-
+/*
+ TODO: pool view
+ * a pool view would simplify the pool access and mean pipeline<...>().pool<T>() can return a coherent class
+ a pool view would basically be a pipeline but for a specific class. it could simplify the synchronization
+*/
 // TODO: sub-pipeline - I need a way to request further resources for synchronisation etc. This breaks the 
 // system for avoiding deadlocks. currently all resources are acquired in a standardised order in the pipeline. 
 // if I want to acquire further resources some of those might be resources that should've been acquired first 
@@ -59,9 +58,9 @@ pool:
 //		keep pipeline
 //		keep view
 //		change pool resources -> currently pool resources are pool<T>::resource, instead I would prefer:
-//			indexer<T> = get_attrib<T, indexer>;
-//			storage<T> = get_attrib<T, storage>;
-//			handler<T> = get_attrib<T, handler>;
+//			indexer<T> = GET_ATTRIB<T, indexer>;
+//			storage<T> = GET_ATTRIB<T, storage>;
+//			handler<T> = GET_ATTRIB<T, handler>;
 //			dispatcher<T> = get_attrib<T, dispatcher>;
 //		add pool_view -> a pool view would be a subset of a pipeline without the resource acquisition
 //						 would be encoded with the resource_set and allow access to pool functions
@@ -77,7 +76,71 @@ pool:
 //		
 //		
 
+// improvements to resource acquisition:
+// TODO: more advanced dead lock avoidance
 
+// INFO: dump - https://www.cs.uic.edu/~jbell/CourseNotes/OperatingSystems/7_Deadlocks -> incase site disappears
+#pragma region DEADLOCK PREVENTION
+// achieve deadlock prevention by preventing at least one of the four conditions:
+
+// Mutual Exclusion - Shared resources such as read-only files. ie pure read only
+// 
+// Hold and Wait - up front allocation of resources
+//    To prevent this condition processes must be prevented from holding one or more resources while simultaneously waiting for one or more others. 
+//    Possible Implementation:
+//   	- Require that all processes request all resources at one time. This can be wasteful of system resources if a process needs one resource early in 
+//       its execution and doesn't need some other resource until much later.
+//   	- Require that processes holding resources must release them before requesting new resources, and then re-acquire the released resources along with 
+//       the new ones in a single new request. 
+//    This can be a problem if a process has partially completed an operation using a resource and then fails to get it re-allocated after releasing it.
+//    Either of the methods described above can lead to starvation if a process requires one or more popular resources.
+
+// No Preemption - release before acquire
+//    Preemption of process resource allocations can prevent this condition of deadlocks, when it is possible. 
+//    Possible Implementation:
+//     - if a process is forced to wait, when requesting a new resource, then all other resources previously held by this process are implicitly released, ( preempted ), 
+//       forcing this process to re-acquire the old resources along with the new resources in a single request, similar to the previous discussion.
+//     - Another approach is that when a resource is requested and not available, then the system looks to see what other processes currently have those resources and
+//       are themselves blocked waiting for some other resource. If such a process is found, then some of their resources may get preempted and added to the list of resources 
+//       for which the process is waiting.
+//    Either of these approaches may be applicable for resources whose states are easily saved and restored, such as registers and memory, but are generally not applicable to other 
+//    devices such as printers and tape drives.
+
+// Circular Wait - sorted acquisiton of resources
+//    One way to avoid circular wait is to number all resources, and to require that processes request resources only in strictly increasing ( or decreasing ) order.
+//    In other words, in order to request resource Rj, a process must first release all Ri such that i >= j.
+//    One big challenge in this scheme is determining the relative ordering of the different resources
+#pragma endregion
+#pragma region SAFE STATE
+// A state is safe if the system can allocate all resources requested by all processes (up to their stated maximums) without entering a deadlock state.
+// More formally, a state is safe if there exists a safe sequence of processes { P0, P1, P2, ..., PN } such that all of the resource requests for Pi can be granted 
+// using the resources currently allocated to Pi and all processes Pj where j < i. (I.e. if all the processes prior to Pi finish and free up their resources, then Pi will be able to finish also, using the resources that they have freed up.)
+// If a safe sequence does not exist, then the system is in an unsafe state, which MAY lead to deadlock. (All safe states are deadlock free, but not all unsafe states lead to deadlocks.)
+#pragma endregion
+#pragma region GRAPH ALGORITHM
+// If resource categories have only single instances of their resources, then deadlock states can be detected by cycles in the resource-allocation graphs.
+// In this case, unsafe states can be recognized and avoided by augmenting the resource-allocation graph with claim edges, noted by dashed lines, which point from a process to a resource that it may request in the future.
+// In order for this technique to work, all claim edges must be added to the graph for any particular process before that process is allowed to request any resources. (Alternatively, processes may only make requests for 
+// resources for which they have already established claim edges, and claim edges cannot be added to any process that is currently holding resources.)
+// When a process makes a request, the claim edge Pi->Rj is converted to a request edge. Similarly when a resource is released, the assignment reverts back to a claim edge.
+// This approach works by denying requests that would produce cycles in the resource-allocation graph, taking claim edges into effect.
+#pragma endregion
+
+// resource defines: 
+// resource type - the type when acquiring this resource
+// resource alias - the key type used when acquiring this resource
+// resource set - the collection of additional resources
+
+// process/pipeline define:
+// max_allocations - 
+// need_allocation
+
+// TODO: pipeline funcs
+// TODO: view where parameter implementation
+// TODO: entity manager
+// TODO: versioner 
+// TODO: dispatcher
+// TODO: 
 
 #include "ecs/registry.h"
 #include "ecs/pipeline.h"
@@ -86,12 +149,33 @@ pool:
 #include <iostream>
 #include <cassert>
 #include "ecs/handler.h"
+
+template<typename ... Ts> 
+struct archetype_element
+{ 
+
+	std::tuple<Ts...> data;
+
+	template<typename ... Us> 
+	archetype_element(Us&& ... component) { } // FIXME: archetype constructor and also just archetype and the rest
+
+	template<typename U> operator U&() { return std::get<U>(data); }
+	template<typename U> operator const U&() const { return std::get<U>(data); }
+};
+
+template<typename ... Ts> using archetype = util::sort_t<archetype_element<Ts...>, util::cmp::less_<util::get_type_ID>::type>;
+
 struct A { int a; };
-struct B { int b; };
-struct C { int c; };
-struct D { };
-struct E { };
-struct F { };
+struct B;
+struct C;
+struct B { using component_type = archetype<B, C>; int b; };
+struct C { using component_type = archetype<C, B>; int c; };
+
+static_assert(std::is_same_v<B::component_type, C::component_type>, "");
+
+struct D { int d; };
+struct E { int e; };
+struct F { int f; };
 
 struct res_A;
 struct res_B;
@@ -122,26 +206,46 @@ static_assert(std::is_same_v<ecs::traits::get_resource_type_t<res_D>, res_A>, ""
 
 int main() {
 	ecs::registry reg;
-	res_A* r1 = &reg.get_resource<res_A>(); // default behaviour, unique resource of type T
-	res_A* r2 = &reg.get_resource<res_B>(); // resource_type=res_A, unique resource of type resource_type<T> 
-	res_A* r3 = &reg.get_resource<res_C>(); // resource_alias=res_B, shares resource with r2
-	res_A* r4 = &reg.get_resource<res_D>(); // resource_alias=res_A, shares resource with r1
-	
-	assert(r1 == r3); // res_C is a resource_alias for res_A
-	assert(r2 == r4); // res_D is a resource_alias for res_B
-	
-	ecs::entity e = 0;
-	auto pip = reg.pipeline<A, B, C>();
-	auto v1 = pip.view<A, B, C>();
-	for (auto [a, b, c] : v1) { }
+	{
+		auto pip = reg.pipeline<const ecs::storage<B>, const ecs::handler<B>>();
+		for (auto [e, b] : pip.view<ecs::entity, const B>()) { }
+		for (const B& b : pip.view<const B>()) { }
+
+		//required from 'class ecs::view_reference<
+		//	ecs::select<ecs::entity, const B>, 
+		//	ecs::from<const ecs::handler_t<archetype_element<B, C> > >, 
+		// ecs::pipeline_t<const ecs::handler_t<archetype_element<B, C> >, const ecs::storage_t<archetype_element<B, C> > >&>'
+	}
+		
+		//{
+		//	std::cout << util::type_name<decltype(e)>() << " e = " << e << ";" << std::endl;
+		//	std::cout << util::type_name<decltype(b)>() << " b = " << b.b << ";" << std::endl;
+		//}
+
+	{
+//		auto pip = reg.pipeline<ecs::handler<A>>();
+//		for (auto [e] : pip.view<ecs::entity>(ecs::from<A>{})) { }
+//			std::cout << util::type_name<decltype(e)>() << " e" << "=" << e << std::endl;
+	}
+
+	{
+//		auto pip = reg.pipeline<ecs::handler<A>, ecs::indexer<C>, ecs::storage<C>>();
+//		for (auto [c] : pip.view<C>(ecs::from<A>{})) { }
+	}
+
+	{	
+//		auto pip = reg.pipeline<ecs::storage<C>>();
+//		using v = ecs::traits::get_resource_set_t<std::tuple<ecs::select<C>, ecs::from<void>, ecs::where<>>>;
+		//std::cout << util::type_name<v>();
+//		for (auto [c] : pip.view<C>(ecs::from<void>{}, ecs::where<>{})) { } // this will acquire handler -> it doesnt necessarily need to
+	}
+
+
 	
 	//pip.template emplace_back<A>(e);
 	//pip.template erase<A>(e);
 	
 	/*
-
-	
-
 	for (uint32_t i = 0; i < 12; ++i) {
 		pip.emplace<A, ecs::immediate>(ecs::entity{i}, i);
 		pip.emplace<B, ecs::immediate>(ecs::entity{i}, i);

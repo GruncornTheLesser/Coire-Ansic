@@ -21,10 +21,8 @@ namespace util { // NOTE: when changing the namespace of this func you must upda
 	template<typename T> constexpr std::basic_string_view<char> type_name() {
 		return { PF_CMD + sizeof(PF_PREFIX) - 1, sizeof(PF_CMD) + 1 - sizeof(PF_PREFIX) - sizeof(PF_SUFFIX) };
 	}
-	template<typename T> struct get_type_name { static constexpr auto value = util::type_name<T>(); };
-	template<typename T> static constexpr std::basic_string_view<char> get_type_name_v = get_type_name<T>::value;
-
-	
+	template<typename T> struct get_type_ID { static constexpr std::basic_string_view<char> value = util::type_name<T>(); };
+	template<typename T> static constexpr std::basic_string_view<char> get_type_ID_v = get_type_ID<T>::value;
 }
 
 #undef PF_CMD

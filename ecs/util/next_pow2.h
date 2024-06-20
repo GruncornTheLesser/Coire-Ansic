@@ -2,7 +2,8 @@
 #include <stdint.h>
 
 namespace util {
-	static constexpr uint32_t next_pow2(uint32_t v) {
+	static constexpr uint32_t next_pow2(uint32_t v) 
+	{
 		v--;
 		v |= v >> 1;
 		v |= v >> 2;
@@ -14,7 +15,8 @@ namespace util {
 		return v;
 	}
 
-	static constexpr uint64_t next_pow2(uint64_t v) {
+	static constexpr uint64_t next_pow2(uint64_t v) 
+	{
 		v--;
 		v |= v >> 1;
 		v |= v >> 2;

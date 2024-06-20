@@ -23,8 +23,8 @@ namespace ecs {
 		pipeline<Us...> pipeline();
 
 		template<typename ... Us, 
-			typename from_T = ecs::view_from_builder_t<ecs::select<Us...>>, 
-			typename where_T = ecs::view_where_builder_t<ecs::select<Us...>, from_T>>
+			typename from_T = ecs::traits::view_from_builder_t<ecs::select<Us...>>, 
+			typename where_T = ecs::traits::view_where_builder_t<ecs::select<Us...>, from_T>>
 		view<select<Us...>, from_T, where_T> view(from_T from = {}, where_T where = {});
 	private:
 		std::unordered_map<std::type_index, util::erased_unique_ptr> data;

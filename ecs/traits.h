@@ -3,8 +3,7 @@
 #include <type_traits>
 #include "util/tuple_util.h"
 
-// note sure this should be done with macros, but it is saving alot of lines, and is more readable??
-// but maybe thats just because I dont understand it v well
+// ? but it is saving alot of lines, and is more readable?
 #define EXPAND(...) __VA_ARGS__
 #define DECL_HAS_ATTRIB_TYPE(NAME)\
 	template<typename T, typename=std::void_t<>> struct has_##NAME : std::false_type { };\
@@ -35,9 +34,6 @@
 	template<typename T> static constexpr TYPE get_##NAME##_v = get_##NAME<T>::value;
 
 
-namespace ecs::traits {
-
-}
 /*
 namespace ecs {
 	template<typename T>

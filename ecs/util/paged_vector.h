@@ -8,47 +8,57 @@
 
 namespace util {
 	// TODO: allocator parameter for paged_vector
-	template<typename T, size_t page_size=4096> class paged_vector;
-	template<typename T, size_t page_size=4096> class paged_vector_iterator;
+	template<typename T, typename Alloc_T=std::allocator<T>, typename Alloc_Page_T=std::allocator<T*>> 
+	class paged_vector;
+	
+	template<typename T> 
+	class paged_vector_iterator;
 
-	template<typename T, size_t page_size>
-	class paged_vector {	
-	private:
+	template<typename T, typename Alloc_T, typename Page_Alloc_T>
+	class paged_vector 
+	{
+		static constexpr size_t page_size = 4096;
 		using page = T*;
-		using alloc_t = std::allocator<T>;
-
 	public:
-		using reference = T&;
-		using const_reference = const T&;
-		using iterator = paged_vector_iterator<T>;
-		using const_iterator = paged_vector_iterator<const T>;
+		using value_type = T;
+		using reference = value_type&;
+		using const_reference = const value_type&;
+		using iterator = paged_vector_iterator<value_type>;
+		using const_iterator = paged_vector_iterator<const value_type>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 	public:
-		paged_vector(size_t n = 0)
+		paged_vector() : count(0), page_count(1), page_capacity(8)
+		{
+			pages = get_page_allocator().allocate(page_capacity);
+			*pages = get_allocator().allocate(page_size);
+		}
+		paged_vector(size_t n, T value = {})
 		{
 			count = n;
 			page_count = (n / page_size) + 1;
 			page_capacity = (8 < page_count) ? page_count : 8;
-			pages = std::allocator<page>().allocate(page_capacity);
-			std::for_each(pages, pages + page_count, [](page& page) { 
-				page = std::allocator<T>().allocate(page_size);
-				std::for_each(page, page + page_size, [](T& value) { 
-					std::construct_at(&value);
+			pages = get_page_allocator().allocate(page_capacity);
+			std::for_each(pages, pages + page_count, [&](page& page)
+			{ 
+				page = get_allocator().allocate(page_size);
+				std::for_each(page, page + page_size, [&value](T& v)
+				{ 
+					std::construct_at(&v, value);
 				});
 			});
 		}
-
 		paged_vector(std::initializer_list<T> ilist) 
 		{
 			count = ilist.size();
 			page_count = (count / page_size) + 1;
 			page_capacity = (8 < page_count) ? page_count : 8;
 
-			pages = std::allocator<page>().allocate(page_capacity);
-			std::for_each(pages, pages + page_count, [](page& page) { 
-				page = std::allocator<T>().allocate(page_size); 
+			pages = get_page_allocator().allocate(page_capacity);
+			std::for_each(pages, pages + page_count, [](page& page) 
+			{ 
+				page = get_allocator().allocate(page_size); 
 			});
 			std::move(ilist.begin(), ilist.end(), begin());
 		}
@@ -69,8 +79,11 @@ namespace util {
 		{
 			if (pages != nullptr)
  			{
-				std::for_each(pages, pages + page_count, [](page p) { std::allocator<T>().deallocate(p, page_size); });
-				std::allocator<page>().deallocate(pages, page_capacity);
+				std::for_each(pages, pages + page_count, [&](page p) 
+				{ 
+					get_allocator().deallocate(p, page_size); 
+				});
+				get_page_allocator().deallocate(pages, page_capacity);
 			}
 		}
 
@@ -79,31 +92,34 @@ namespace util {
 			count = other.count;
 			page_count = other.page_count;
 			page_capacity = other.page_capacity;
-			pages = std::allocator<page>().allocate(page_capacity);
+			pages = get_page_allocator().allocate(page_capacity);
 
 			int back = page_count - 1;
-			for (int i = 0; i < back; ++i) {
-				pages[i] = std::allocator<T>().allocate(page_size); 
+			for (int i = 0; i < back; ++i) 
+			{
+				pages[i] = get_allocator().allocate(page_size); 
 				std::copy(other.pages[i], other.pages[i] + page_size, pages[i]);
 			}
-			pages[back] = std::allocator<T>().allocate(page_size); 
+			pages[back] = get_allocator().allocate(page_size); 
 			std::copy(other.pages[back], other.pages[back] + count % page_size, pages[back]);
 		}
 		paged_vector& operator=(const paged_vector& other) 
 		{
-			if (pages != other.pages) {
+			if (pages != other.pages) 
+			{
 				count = other.count;
 				page_count = other.page_count;
 				page_capacity = other.page_capacity;
-				pages = std::allocator<page>().allocate(page_capacity);
+				pages = get_page_allocator().allocate(page_capacity);
 
 				int back = page_count - 1;
-				for (int i = 0; i < back; ++i) {
-					pages[i] = std::allocator<T>().allocate(page_size); 
+				for (int i = 0; i < back; ++i) 
+				{
+					pages[i] = get_allocator().allocate(page_size); 
 					std::copy(other.pages[i], other.pages[i] + page_size, pages[i]);
 				}
 				
-				pages[back] = std::allocator<T>().allocate(page_size); 
+				pages[back] = get_allocator().allocate(page_size); 
 				std::copy(other.pages[back], other.pages[back] + count % page_size, pages[back]);
 			}
 
@@ -237,17 +253,18 @@ namespace util {
 				{
 					size_t new_page_capacity = util::next_pow2(new_page_count);
 
-					page* new_pages = std::allocator<page>().allocate(new_page_capacity);
+					page* new_pages = get_page_allocator().allocate(new_page_capacity);
 					std::move(pages, pages + page_count, new_pages);
 					
-					std::allocator<page>().deallocate(pages, page_capacity);
+					get_page_allocator().deallocate(pages, page_capacity);
 
 					page_capacity = new_page_capacity;
 					pages = new_pages;
 				}
 
-				std::for_each(pages + page_count, pages + new_page_count, [](page& page) { 
-					page = std::allocator<T>().allocate(page_size); 
+				std::for_each(pages + page_count, pages + new_page_count, [&](page& page)
+				{ 
+					page = get_allocator().allocate(page_size); 
 				});
 				page_count = new_page_count;
 			}
@@ -256,8 +273,9 @@ namespace util {
 		{
 			size_t new_page_count = count / page_size + 1;
 
-			std::for_each(pages + new_page_count, pages + page_count, [](page p) { 
-				std::allocator<T>().deallocate(p, page_size); 
+			std::for_each(pages + new_page_count, pages + page_count, [](page p)
+			{ 
+				get_allocator().deallocate(p, page_size); 
 			});
 			page_count = new_page_count;
 		}
@@ -289,8 +307,8 @@ namespace util {
 		{ 
 			return emplace(pos, value);
 		}
-		iterator insert(const_iterator pos, const T&& value) 
-		{ 
+		iterator insert(const_iterator pos, T&& value) 
+		{
 			return emplace(pos, std::move(value));
 		}
 		iterator insert(const_iterator pos, size_t n, const T& value)
@@ -301,7 +319,7 @@ namespace util {
 			std::fill_n(begin() + offset, n, value);
 			return begin() + offset;
 		}
-		iterator insert(const_iterator pos, size_t n, const T&& value)
+		iterator insert(const_iterator pos, size_t n, T&& value)
 		{ 
 			size_t offset = pos - cbegin();
 			size_t new_size = count + n;
@@ -350,14 +368,14 @@ namespace util {
 			count -= n;
 			return it1;
 		}
-		void push_back(const T& value) 
+		void push_back(const T& value)
 		{ 
 			size_t index = count; 
 			reserve(++count);
 			size_t page_index = page_count - 1;
 			pages[page_index][index - page_index * page_size] = value;
 		}
-		void push_back(const T&& value) 
+		void push_back(T&& value)
 		{ 
 			size_t index = count; 
 			reserve(++count); 
@@ -396,17 +414,29 @@ namespace util {
 			other.pages = temp_pages;
 		}
 		
+		Alloc_T& get_allocator() 
+		{
+			return alloc;
+		}
+		Page_Alloc_T& get_page_allocator() 
+		{
+			return page_alloc;
+		}
 	private:
+		Alloc_T alloc;
+		Page_Alloc_T page_alloc;
+
 		size_t count;
 		size_t page_count;
 		size_t page_capacity;
 		page* pages;
 	};
 
-	template<typename T, size_t page_size>
-	class paged_vector_iterator {
+	template<typename T>
+	class paged_vector_iterator 
+	{
+		static constexpr size_t page_size = 4096;
 	public:
-		
 		using container_type = paged_vector<std::remove_const_t<T>>;
 		using iterator_category = std::random_access_iterator_tag;
 		using data_type = std::remove_const_t<T>**;
