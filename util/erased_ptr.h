@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <functional>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdelete-incomplete"

@@ -84,7 +84,8 @@
 		"chrono": "cpp",
 		"type_traits": "cpp",
 		"*.tpp": "cpp",
-		"compare": "cpp"
+		"compare": "cpp",
+		"list": "cpp"
 	},
 	"todo-tree.tree.showCountsInTree": false,
 	"todo-tree.tree.showBadges": true,
