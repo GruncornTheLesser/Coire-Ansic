@@ -4,8 +4,8 @@
 #include <tuple>
 #include "util/tuple_util.h"
 #include "traits.h"
-#include "component.h"
-#include "entity.h"
+//#include "component.h"
+#include "handle.h"
 #include "view_arguments.h"
 
 namespace ecs 
@@ -26,7 +26,7 @@ namespace ecs
 	class view
 	{
 	public:
-		using resource_set = std::tuple<Select_T, From_T, where_T>;
+		using resource_lockset = std::tuple<Select_T, From_T, where_T>;
 
 		using iterator = view_iterator<Select_T, From_T, where_T, Pip_T>;
 		using const_iterator = view_iterator<util::eval_each_t<Select_T, std::add_const>, From_T, where_T, Pip_T>;
@@ -274,7 +274,7 @@ ecs::view_reference<Select_T, From_T, Pip_T>::view_reference(Pip_T& pip, size_t 
 {
 	if constexpr (util::anyof_v<Select_T, util::pred::disjunction_<
 			util::compare_to_<ecs::entity, util::cmp::is_ignore_const_same>::template type,
-			util::compare_to_<typename From_T::type, std::is_same, util::wrap_<ecs::handler>::template type>::template type 
+			util::compare_to_<typename From_T::type, std::is_same, util::wrap_<ecs::manager>::template type>::template type 
 		>::template type>)
 	{
 		ent = pip.template get_resource<typename From_T::type>()[ind];
@@ -288,7 +288,7 @@ ecs::view_reference<Select_T, From_T, Pip_T>::get()
 {
 	using T = std::remove_reference_t<std::tuple_element_t<N, view_reference>>;
 	using indexer_t = const ecs::indexer<std::remove_const_t<T>>;
-	using storage_t = util::propergate_const_wrap_t<T, storage>;
+	using storage_t = util::propagate_const_wrap_t<T, storage>;
 
 	if constexpr (std::is_same_v<ecs::entity, std::remove_const_t<T>>)
 		return ent;
@@ -310,7 +310,7 @@ std::tuple_element_t<N, const ecs::view_reference<Select_T, From_T, Pip_T>>
 ecs::view_reference<Select_T, From_T, Pip_T>::get() const {
 	using T = std::remove_reference_t<std::tuple_element_t<N, view_reference>>;
 	using indexer_t = const ecs::indexer<std::remove_const_t<T>>;
-	using storage_t = util::propergate_const_wrap_t<T, storage>;
+	using storage_t = util::propagate_const_wrap_t<T, storage>;
 	
 	if constexpr (std::is_same_v<ecs::entity, std::remove_const_t<T>>)
 		return ent;

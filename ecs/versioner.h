@@ -1,55 +1,60 @@
 #pragma once
-#include "util/paged_vector.h"
-#include "entity.h"
-namespace ecs {
-	
-	// TODO: make custom type
-	typedef uint32_t version;
+#include <stdint.h>
+
+/*
+!!! MUST EXTRACT index easily from  
+TODO: 
+
+*/
+
+namespace ecs 
+{
+	using version = uint32_t;
 	
 	template<typename T>
-	struct version_pair
+	struct versioned
 	{
-		template<typename storage_T>
-		friend class version_view;
+		template<typename> friend class versioner;
+		template<typename> friend class versioner_iterator;
 
 	public:
 		template<typename ... Arg_Ts>
-		version_pair(Arg_Ts ... args) : value(std::forward<Arg_Ts>(args)...), version(0), next(nullptr) { }
-		// ? maybe this should be an explicit get func. 
-		// ? would maybe get syntax like: so storage[i].get(), handler[i].get(), indexer[i].get()
+		versioned(Arg_Ts ... args) : value(std::forward<Arg_Ts>(args)...), next(nullptr) { }
+
 		operator T&() { return value; } 
 		operator const T&() const { return value; }
-		//operator T() const { return value; }
 	private:
 		T value;
-		version version;
-		version_pair<T>* next;
+		versioned<T>* next;
 	};
 
 	template<>
-	struct version_pair<void>
+	struct versioned<void>
 	{
+		template<typename> friend class versioner;
+		template<typename> friend class versioner_iterator;
+
+	private:
 		version version = 0;
-		version_pair* next = nullptr;
+		versioned* next = nullptr;
 	};
-}
-
-namespace ecs {
-	template<typename T>
-	class version_view_iterator;
 
 	template<typename T>
-	class version_view
+	class versioner_iterator;
+
+	template<typename T>
+	class versioner final
 	{
 	public:
-		using value_type = version_pair<T>;
-		using reference = value_type&;
+		using value_type = versioned<T>;
 		using pointer = value_type*;
-		using const_reference = const value_type&;
-		using iterator = version_view_iterator<value_type>;
-		using const_iterator = version_view_iterator<const value_type>;
+		using reference = value_type&;
+		using const_pointer = const pointer;
+		using const_reference = const reference;
+		using iterator = versioner_iterator<versioned<T>>;
+		using const_iterator = versioner_iterator<const versioned<T>>;
 
-		version_view() : current_version(0), head(nullptr) { }
+		versioner() : current_version(1), head(head) { }
 		
 		iterator begin() { return { head, current_version }; }
 		const_iterator begin() const { return { head, current_version }; }
@@ -59,34 +64,33 @@ namespace ecs {
 		const_iterator end() const { return { nullptr, current_version }; }
 		const_iterator cend() const { return { nullptr, current_version }; }
 		
-		reference pop() 
-		{ 
-			--head->version;
+		reference pop()
+		{
+			// --head->version; // version assigned to null_version
 			pointer temp = head;
 			head = head->next;
 			return *temp;
 		}
 		
-		void push_back(reference elem)
-		{ 
-			if (elem.version == current_version) return; 
+		void update(reference elem)
+		{
+			if (elem.version == current_version) return;
 
 			elem.next = head;
 			head = &elem;
-			elem.version = current_version;
 		}
 
-		bool active(reference elem) 
-		{
-			return elem.version == current_version; 
-		}
-		
 		void clear()
 		{
 			++current_version;
 			head = nullptr;
 		}
-
+		
+		bool contains(const_reference elem) const
+		{
+			return elem.version == current_version;
+		}
+		
 		bool empty() const 
 		{ 
 			return head == nullptr;
@@ -94,25 +98,28 @@ namespace ecs {
 
 	private:
 		version current_version;
-		version_pair<T>* head;
+		versioned<T>* head;
 	};
 
 	template<typename T>
-	class version_view_iterator 
+	class versioner_iterator
 	{
+		template<typename> friend class versioner;
+
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = T;
 		using pointer = value_type*;
 		using reference = value_type&;
 		using difference_type = std::ptrdiff_t;
 		
-		version_view_iterator(pointer ptr, version vers) : ptr(ptr), vers(vers) { }
-		
-		operator version_view_iterator<const T>() const { return { ptr, vers }; }
+		versioner_iterator(pointer ptr, version vers) : ptr(ptr), vers(vers) { }
+	
+	public:
+		operator versioner_iterator<const T>() const { return { ptr, vers }; }
 
 		reference operator*() { return *ptr; }
 		
-		version_view_iterator& operator++() 
+		versioner_iterator& operator++() 
 		{ 
 			if (ptr != nullptr) {
 				if (ptr->version == vers) ptr = ptr->next;
@@ -120,8 +127,8 @@ namespace ecs {
 			}
 			return *this;
 		}
-		version_view_iterator operator++(int) { 
-			version_view_iterator temp = *this;
+		versioner_iterator operator++(int) { 
+			versioner_iterator temp = *this;
 			if (ptr != nullptr) {
 				if (ptr->version == vers) ptr = ptr->next;
 				else ptr = nullptr;
@@ -129,11 +136,12 @@ namespace ecs {
 			return temp;
 		}
 		
-		bool operator==(const version_view_iterator& other) { return ptr == other.ptr; }
-		bool operator!=(const version_view_iterator& other) { return ptr != other.ptr; }
+		bool operator==(const versioner_iterator& other) { return ptr == other.ptr; }
+		bool operator!=(const versioner_iterator& other) { return ptr != other.ptr; }
 		
 	private:
 		pointer ptr;
 		version vers;
 	};
+
 }

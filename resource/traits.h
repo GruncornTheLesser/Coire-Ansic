@@ -72,25 +72,6 @@ namespace resource::traits {
 	
 	template<typename T>
 	using get_lockset_t = typename get_lockset<T>::type;
-	
-	/*
-	get_lockset<res_A, std::tuple<>> -> std::tuple<res_A>
-	*/
-	/*
-	get_lockset<res_B, std::tuple<>
-		get_lockset<std::tuple<int, float>, std::tuple<res_B>>
-			get_lockset<int, std::tuple<res_B>> -> std::tuple<int>
-			get_lockset<float, std::tuple<res_B>> -> std::tuple<float>
-
-	*/
-	/*
-	get_lockset<res_C, std::tuple<>> 
-		get_lockset<tuple<res_C, res_B>, std::tuple<res_C>>
-			get_lockset<res_C, std::tuple<res_C>> -> std::tuple<res_C>
-			get_lockset<res_B, std::tuple<res_C>> -> std::tuple<int, float>
-		concat -> std::tuple<res_C, int, float>
-	*/
-
 
 
 

@@ -34,7 +34,7 @@ namespace util {
 			pages = get_page_allocator().allocate(page_capacity);
 			*pages = get_allocator().allocate(page_size);
 		}
-		paged_vector(size_t n, T value = {})
+		paged_vector(size_t n, const T& value)
 		{
 			count = n;
 			page_count = (n / page_size) + 1;
@@ -303,6 +303,7 @@ namespace util {
 			std::construct_at<T>(&back(), std::forward<Arg_Ts>(args)...);
 			return back();
 		}
+		
 		iterator insert(const_iterator pos, const T& value) 
 		{ 
 			return emplace(pos, value);
@@ -329,15 +330,15 @@ namespace util {
 			count = new_size;
 			return begin() + offset;
 		}
-		template<std::input_iterator InputIt>
-		iterator insert(const_iterator pos, InputIt first, InputIt last)
+		template<typename It>
+		iterator insert(const_iterator pos, It first, It last)
 		{ 
 			size_t n = last - first;
 			size_t offset = pos - cbegin();
 			size_t new_size = count + n;
 			reserve(new_size);
 			std::move_backward(pos, cend(), end() + n);
-			std::move(first, last, begin() + offset);
+			std::move_backward(first, last, begin() + offset);
 			count = new_size;
 			return begin() + offset;
 		}
@@ -345,6 +346,7 @@ namespace util {
 		{ 
 			return insert(pos, ilist.begin(), ilist.end());
 		}
+		
 		iterator erase(const_iterator pos)
 		{
 			iterator it1 = begin() + (pos - cbegin());
@@ -368,6 +370,7 @@ namespace util {
 			count -= n;
 			return it1;
 		}
+		
 		void push_back(const T& value)
 		{ 
 			size_t index = count; 
@@ -390,10 +393,12 @@ namespace util {
 		void resize(size_t n) 
 		{
 			reserve(n);
+			
 			if (n < count)
 				std::destroy_n(begin(), n);
 			else
 				std::for_each_n(begin() + count, n, [](T& value) { std::construct_at<T>(&value); });
+			
 			count = n;
 		}
 		void swap(paged_vector<T>& other)

@@ -1,38 +1,25 @@
 #pragma once
 #include "util/tuple_util.h"
-#include "handler.h"
-#include "resource.h"
-#include <tuple>
+#include "traits.h"
 #include "entity.h"
-#include "resource.h"
-#include "util/tuple_util.h"
-
 namespace ecs::traits {
 	template<typename T>
-	concept select_arg_class = ecs::traits::is_component_v<T> || is_entity_v<T>;
+	concept select_arg_class = is_component_v<T> || util::cmp::is_ignore_cv_same_v<T, entity>;
 
 	template<typename T>
-	concept from_arg_class = ecs::traits::is_component_v<T> || util::is_wrapped_by_v<T, ecs::storage_t> || util::is_wrapped_by_v<T, ecs::handler_t>;
+	concept from_arg_class = is_component_v<T> || is_storage_v<T> || is_manager_v<T>; // or storage or manager
 
 	template<typename T>
-	concept where_arg_class = true;
+	concept where_arg_class = std::is_invocable_v<T>; // is callable, and returns bool
 }
 
 namespace ecs {
-	template<traits::select_arg_class ... Ts> 
-	struct select;
-
-	template<traits::from_arg_class T>
-	struct from;
-
-	template<traits::where_arg_class ... Ts> 
-	struct where;
-
-	template<traits::component_class ... Ts> 
-	struct include;
-
-	template<traits::component_class ... Ts> 
-	struct exclude;
+	template<traits::select_arg_class ... Ts> struct select;
+	template<traits::from_arg_class T> struct from;
+	template<traits::where_arg_class ... Ts> struct where;
+	template<traits::component_class ... Ts> struct include;
+	template<traits::component_class ... Ts> struct exclude;
+	// just a functor
 }
 
 // builders
@@ -81,85 +68,79 @@ template<ecs::traits::select_arg_class ... Ts>
 struct ecs::select
 {
 public:
-	using resource_set = util::eval_t<std::tuple<Ts...>, 
+	using resource_lockset = util::eval_t<std::tuple<Ts...>, 
 		util::filter_<util::pred::disjunction_<std::is_empty, traits::is_entity>::template negated>::template type,
-		util::eval_each_<util::propergate_const_<util::wrap_<storage>::template type>::template type>::template type, 
-		util::sort_<util::cmp::less_<std::is_const>::type>::type, 
-		util::unique_<util::cmp::is_ignore_cvref_same>::type>;
+		util::eval_each_<util::propagate_const_<util::wrap_<storage>::template type>::template type>::template type, 
+		util::unique_priority_<util::cmp::is_ignore_cv_same, util::cmp::less_<std::is_const>::template type>::template type>;
 
 	// the set of values that view_reference evaluates to
 	using retrieve_set = util::eval_t<std::tuple<Ts...>, 
 		util::filter_<util::pred::negate_<std::is_empty>::template type>::template type, // remove empty types
-		util::eval_each_<util::eval_if_<util::compare_to_<ecs::entity, util::cmp::is_ignore_cvref_same>::template type, 
-			std::remove_cvref, std::add_lvalue_reference>::template type>::template type>;
+		util::eval_each_<util::eval_if_<util::compare_to_<ecs::entity, util::cmp::is_ignore_cv_same>::template type, 
+			std::remove_cv, std::add_lvalue_reference>::template type>::template type>;
 };
 
 template<ecs::traits::from_arg_class T> 
 struct ecs::from 
 { 
-	using type = const util::eval_if_t<T, util::pred::disjunction_<
-			util::is_wrapped_by_<ecs::storage_t>::template type, 
-			util::is_wrapped_by_<ecs::handler_t>::template type
-		>::template negated, util::wrap_<ecs::handler>::type>;
-	using resource_set = std::tuple<type>;
+	using resource_alias = const util::eval_if_t<T, traits::is_component, util::wrap_<ecs::manager>::type>;
 };
 
 template<ecs::traits::where_arg_class ... Ts>
 struct ecs::where 
 {
-	using resource_set = util::concat_t<util::eval_each_t<std::tuple<Ts...>, traits::get_resource_set>>;
-	// TODO: add retrieve set, pass each to check func -> could change to operator() func check more explicit
-	
-
+	using resource_lockset = std::tuple<Ts...>;
 
 	template<typename pip_T>
-	static bool check(pip_T& pip, ecs::entity ent) { return (Ts::check(pip, ent) && ...); }
+	static bool valid(pip_T& pip, ecs::entity ent) { return (Ts::valid(pip, ent) && ...); }
 };
 
 template<ecs::traits::component_class ... Ts>
 struct ecs::include 
 {
-	using resource_set = std::tuple<const indexer<std::remove_const_t<Ts>>...>;
+	using resource_lockset = std::tuple<const indexer<Ts>>...>;
 
-	template<typename pip_T>
-	static bool check(pip_T& pip, ecs::entity ent) { 
-		return (pip.template get_resource<const indexer<std::remove_const_t<Ts>>>().contains(ent) && ...); 
+	template<typename base_T>
+	static bool valid(base_T& base, ecs::entity e) { 
+		return (base.template get_resource<const indexer<Ts>>>().contains(e) && ...); 
 	}
 };
 
 template<ecs::traits::component_class ... Ts>
 struct ecs::exclude 
 {
-	using resource_set = std::tuple<const indexer<std::remove_const_t<Ts>>...>;
+	using resource_lockset = std::tuple<const indexer<Ts>>...>;
 
-	template<typename pip_T>
-	static bool check(pip_T& pip, ecs::entity ent) { return !(pip.template get_resource<const indexer<std::remove_const_t<Ts>>>().contains(ent) || ...); }
+	template<typename base_T>
+	static bool valid(base_T& base, ecs::entity e) { 
+		return !(base.template get_resource<const indexer<Ts>>().contains(e) || ...); 
+	}
 };
 
 template<typename select_T>
 struct ecs::traits::view_from_builder 
 { 
 	using type = util::wrap_t<util::post_eval_if_t<select_T, 
-		util::find_<is_component>::template type,
+		util::find_first_<is_component>::template type,
 		is_storage_iterable, // select_T is storage iterable
 		util::wrap_<ecs::storage>::template type, 
-		util::wrap_<ecs::handler>::template type>, ecs::from>;
+		util::wrap_<ecs::manager>::template type>, ecs::from>;
 };
 
 template<typename select_T, typename from_T>
 struct ecs::traits::view_where_builder 
 {
 	using type = std::conditional_t<util::is_wrapped_by_v<from_T, ecs::storage_t>, ecs::where<>, util::eval_t<select_T, 
-		util::filter_<util::pred::disjunction_<is_entity, util::add_type_args_<is_indexable, from_T>::template type>::template negated>::template type, 
+		util::filter_<util::pred::disjunction_<is_entity, util::add_arg_<is_indexable, from_T>::template type>::template negated>::template type, 
 		util::rewrap_<ecs::include>::template type>>;
 };
 
 
 template<typename T, typename from_t>
 struct ecs::traits::is_indexable
- : std::disjunction<std::is_same<typename from_t::type, const handler<T>>, std::is_same<typename from_t::type, const storage<T>>> { };
+ : std::disjunction<std::is_same<typename from_t::type, const manager<T>>, std::is_same<typename from_t::type, const storage<T>>> { };
 
 template<typename select_T>
 struct ecs::traits::is_storage_iterable
- : std::conjunction<std::negation<util::anyof<select_T, is_entity>>, util::allof<typename select_T::resource_set, 
-	util::compare_to_<util::get_front_t<typename select_T::resource_set>, util::cmp::is_ignore_cvref_same>::template type>> { };
+ : std::conjunction<std::negation<util::anyof<select_T, is_entity>>, util::allof<typename select_T::resource_lockset, 
+	util::compare_to_<util::get_front_t<typename select_T::resource_lockset>, util::cmp::is_ignore_cv_same>::template type>> { };
