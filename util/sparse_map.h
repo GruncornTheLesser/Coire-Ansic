@@ -3,7 +3,6 @@
 #include <exception>
 #include <cassert>
 #include <algorithm>
-#include "next_pow2.h"
 
 // TODO: could also try hierarchal paging
 // std::map has functions for iterating through the set of key hashes, it would fit quite nicely to align these with the pages
@@ -11,7 +10,7 @@
 // every time I look at this file I have these impure thoughts - sparse mapping works because it is simple - I forbid you from over complicating it. again.
 
 // TODO: tidy up sparse map and align with std::map interface
-// template<std::integral key_t, typename val_t, val_t tombstone=val_t{}>
+// template<typename key_t, typename val_t, val_t tombstone=val_t{}>
 
 /*
 (constructor) - constructs the map
@@ -53,21 +52,19 @@ value_comp - returns the function that compares keys in objects of type value_ty
 
 */
 namespace util {
-	template<std::integral key_t, typename val_t, val_t tombstone=val_t{}> 
+	template<typename key_t, typename val_t, val_t tombstone=val_t{}> 
 	class sparse_map 
 	{
-		static_assert(std::is_trivial_v<key_t> && std::is_trivial_v<val_t>, "value type and key type must be trivial");
 	public:
 		static constexpr size_t page_size = 4096;
 
 		sparse_map(size_t new_page_count = 8);
 		~sparse_map();
-
-		sparse_map(sparse_map& other);
-		sparse_map& operator=(sparse_map& other);
-		sparse_map(sparse_map&& other);
-		sparse_map& operator=(sparse_map&& other);
 		
+		sparse_map(sparse_map<key_t, val_t, tombstone>& other);
+		sparse_map<key_t, val_t, tombstone>& operator=(sparse_map<key_t, val_t, tombstone>& other);
+		sparse_map(sparse_map<key_t, val_t, tombstone>&& other);
+		sparse_map<key_t, val_t, tombstone>& operator=(sparse_map<key_t, val_t, tombstone>&& other);
 		
 		val_t& operator[](key_t key);
 		const val_t& operator[](key_t key) const;
@@ -80,7 +77,7 @@ namespace util {
 		size_t capacity() const;
 		
 		bool contains(size_t key) const;
-		
+
 	private:
 		val_t* assure_page(size_t page_index);
 
@@ -89,32 +86,52 @@ namespace util {
 	};
 }
 
-template<std::integral key_t, typename val_t, val_t tombstone>
+template<typename key_t, typename val_t, val_t tombstone>
 util::sparse_map<key_t, val_t, tombstone>::sparse_map(size_t new_page_count) : page_capacity(new_page_count) {
 	pages = std::allocator<val_t*>().allocate(page_capacity);
 	std::fill(pages, pages + page_capacity, nullptr);
 }
 
 
-template<std::integral key_t, typename val_t, val_t tombstone>
-util::sparse_map<key_t, val_t, tombstone>::~sparse_map() {
-	std::for_each(pages, pages + page_capacity, [](val_t* page) { 
-		if (page != nullptr) std::allocator<val_t>().deallocate(page, page_size); 
-	});
-	std::allocator<val_t*>().deallocate(pages, page_size);
+template<typename key_t, typename val_t, val_t tombstone>
+util::sparse_map<key_t, val_t, tombstone>::~sparse_map() 
+{
+	if (pages != nullptr)
+	{
+		std::for_each(pages, pages + page_capacity, [](val_t* page) { 
+			if (page != nullptr) std::allocator<val_t>().deallocate(page, page_size); 
+		});
+		std::allocator<val_t*>().deallocate(pages, page_size);
+	}
 }
 		
-/*
 
-sparse_map(sparse_map& other);
-sparse_map& operator=(sparse_map& other);
-sparse_map(sparse_map&& other);
-sparse_map& operator=(sparse_map&& other);
+////template<typename K, typename V, V T>
+////util::sparse_map<K, V, T>::sparse_map(sparse_map<K, V, T>& other);
 
-*/
+////template<typename K, typename V, V T>
+////util::sparse_map<K, V, T>& util::sparse_map<K, V, T>::operator=(sparse_map<K, V, T>& other);
+
+template<typename key_t, typename val_t, val_t tombstone>
+util::sparse_map<key_t, val_t, tombstone>::sparse_map(sparse_map&& other) 
+{
+	pages = other.pages;
+	page_capacity = other.page_capacity;
+	other.pages = nullptr;
+	other.page_capacity = 0;
+}
+
+template<typename key_t, typename val_t, val_t tombstone>
+util::sparse_map<key_t, val_t, tombstone>& util::sparse_map<key_t, val_t, tombstone>::operator=(sparse_map<key_t, val_t, tombstone>&& other) 
+{ 
+	std::swap(pages, other.pages);
+	std::swap(page_capacity, other.page_capacity);
+}
 
 
-template<std::integral key_t, typename val_t, val_t tombstone>
+
+
+template<typename key_t, typename val_t, val_t tombstone>
 val_t& util::sparse_map<key_t, val_t, tombstone>::operator[](key_t key) 
 {
 	size_t page_index = key / page_size;
@@ -123,7 +140,7 @@ val_t& util::sparse_map<key_t, val_t, tombstone>::operator[](key_t key)
 }
 
 
-template<std::integral key_t, typename val_t, val_t tombstone>
+template<typename key_t, typename val_t, val_t tombstone>
 const val_t& util::sparse_map<key_t, val_t, tombstone>::operator[](key_t key) const {
 	size_t page_index = key / page_size;
 	size_t elem_index = key % page_size;
@@ -134,7 +151,7 @@ const val_t& util::sparse_map<key_t, val_t, tombstone>::operator[](key_t key) co
 	return pages[page_index][elem_index];
 }
 		
-template<std::integral key_t, typename val_t, val_t tombstone>
+template<typename key_t, typename val_t, val_t tombstone>
 val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key) 
 {
 	size_t page_index = key / page_size;
@@ -144,7 +161,7 @@ val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key)
 	return pages[page_index][elem_index];
 }
 
-template<std::integral key_t, typename val_t, val_t tombstone>
+template<typename key_t, typename val_t, val_t tombstone>
 const val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key) const 
 {
 	size_t page_index = key / page_size;
@@ -155,18 +172,18 @@ const val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key) const
 	return pages[page_index][elem_index];
 }
 
-template<std::integral key_t, typename val_t, val_t tombstone>
+template<typename key_t, typename val_t, val_t tombstone>
 void util::sparse_map<key_t, val_t, tombstone>::reserve(key_t key) 
 {
 	assure_page(key / page_size);
 }
 
-template<std::integral key_t, typename val_t, val_t tombstone>
+template<typename key_t, typename val_t, val_t tombstone>
 size_t util::sparse_map<key_t, val_t, tombstone>::capacity() const { 
 	return page_capacity * page_size;
 }
 
-template<std::integral key_t, typename val_t, val_t tombstone>	
+template<typename key_t, typename val_t, val_t tombstone>	
 bool util::sparse_map<key_t, val_t, tombstone>::contains(size_t key) const 
 {
 	size_t page_index = key / page_size;
@@ -174,7 +191,7 @@ bool util::sparse_map<key_t, val_t, tombstone>::contains(size_t key) const
 	return page_index <= page_capacity && pages[page_index] != nullptr && pages[page_index][elem_index] != tombstone;
 }
 
-template<std::integral key_t, typename val_t, val_t tombstone>		
+template<typename key_t, typename val_t, val_t tombstone>		
 val_t* util::sparse_map<key_t, val_t, tombstone>::assure_page(size_t page_index)
 {
 	if (page_index >= page_capacity) 

@@ -5,35 +5,35 @@
 #include <iostream>
 #include <cassert>
 #include "traits.h"
-#include "../util/tuple_util.h"
+#include "../tuple_util/tuple_util.h"
 
 namespace resource 
 {
 	enum class priority { NONE=-1, LOW=0, MEDIUM=1, HIGH=2 };
 
 	template<typename T, size_t N>
-	class resource_ptr_t;
+	class locked_ptr_t;
 
 	template<typename T>
-	using resource_ptr = resource_ptr_t<resource::traits::get_type_t<T>, resource::traits::get_instance_count_v<T>>;
+	using locked_ptr = locked_ptr_t<traits::get_type_t<T>, traits::get_inst_count_v<T>>;
 
 	template<typename T, size_t N>
 	class pool_t;
 
 	template<typename T>
-	using pool = pool_t<std::remove_cv_t<resource::traits::get_type_t<T>>, resource::traits::get_instance_count_v<T>>;
+	using pool = pool_t<std::remove_cv_t<traits::get_type_t<T>>, traits::get_inst_count_v<T>>;
 
 	template<typename T, size_t N>
 	class pool_t 
 	{
-		friend class resource_ptr_t<T, N>;
-		friend class resource_ptr_t<const T, N>;
-		friend class resource_ptr_t<volatile T, N>;
-		friend class resource_ptr_t<const volatile T, N>;
+		friend class locked_ptr_t<T, N>;
+		friend class locked_ptr_t<const T, N>;
+		friend class locked_ptr_t<volatile T, N>;
+		friend class locked_ptr_t<const volatile T, N>;
 
 		void notify_next() 
 		{
-			for (int i=2; i <= 0; --i)
+			for (int i=2; i >= 0; --i)
 			{ 
 				if (exclusive_wait_count[i])
 				{
@@ -82,13 +82,13 @@ namespace resource
 	};
 
 	template<typename T, size_t N>
-	class resource_ptr_t
+	class locked_ptr_t
 	{
 		using pool_type = pool_t<std::remove_cv_t<T>, N>;
 
 		// if volatile = 1
-		static constexpr enum { VOLATILE, CONSTANT, EXCLUSIVE } access = 
-			std::is_volatile_v<T> ? VOLATILE : (std::is_const_v<T> ? CONSTANT : EXCLUSIVE);
+		static constexpr enum { VOLATILE, CONSTANT, EXCLUSIVE } access = std::is_volatile_v<T> ? VOLATILE : (std::is_const_v<T> ? CONSTANT : EXCLUSIVE);
+		
 		template<typename U>
 		static constexpr bool is_copyable = (std::is_const_v<T> && std::is_const_v<U>) || 
 			(access==VOLATILE && util::cmp::is_const_accessible_v<T, U>);
@@ -98,20 +98,20 @@ namespace resource
 			(access==VOLATILE && util::cmp::is_const_accessible_v<T, U>);
 
 	public:
-		resource_ptr_t(pool_type* pool, priority p = priority::NONE);
-		~resource_ptr_t();
+		locked_ptr_t(pool_type* pool, priority p = priority::NONE);
+		~locked_ptr_t();
 
 		template<typename U>
-		resource_ptr_t(resource_ptr_t<U, N>& other) requires (is_copyable<U>);
+		locked_ptr_t(locked_ptr_t<U, N>& other) requires (is_copyable<U>);
 		
 		template<typename U>
-		resource_ptr_t<T, N>& operator=(resource_ptr_t<U, N>& other) requires (is_copyable<U>);
+		locked_ptr_t<T, N>& operator=(locked_ptr_t<U, N>& other) requires (is_copyable<U>);
 
 		template<typename U>
-		resource_ptr_t(resource_ptr_t<U, N>&& other) requires (is_movable<U>);
+		locked_ptr_t(locked_ptr_t<U, N>&& other) requires (is_movable<U>);
 		
 		template<typename U>
-		resource_ptr_t<T, N>& operator=(resource_ptr_t<U, N>&& other) requires (is_movable<U>);
+		locked_ptr_t<T, N>& operator=(locked_ptr_t<U, N>&& other) requires (is_movable<U>);
 
 		T& operator*();
 		const T& operator*() const;
@@ -130,21 +130,21 @@ namespace resource
 }
 
 template<typename T, size_t N>
-resource::resource_ptr_t<T, N>::resource_ptr_t(pool_type* pl, resource::priority p)
+resource::locked_ptr_t<T, N>::locked_ptr_t(pool_type* pl, resource::priority p)
  : pl(pl)
 {
 	if (p != priority::NONE) lock(p);
 }
 
 template<typename T, size_t N>
-resource::resource_ptr_t<T, N>::~resource_ptr_t()
+resource::locked_ptr_t<T, N>::~locked_ptr_t()
 {
 	if (ptr != nullptr) unlock();
 }
 
 template<typename T, size_t N>
 template<typename U> 
-resource::resource_ptr_t<T, N>::resource_ptr_t(resource::resource_ptr_t<U, N>& other) requires (is_copyable<U>)
+resource::locked_ptr_t<T, N>::locked_ptr_t(resource::locked_ptr_t<U, N>& other) requires (is_copyable<U>)
  : pl(other.pl), ptr(other.ptr)
 { 
 	ptr = other.ptr;
@@ -156,7 +156,7 @@ resource::resource_ptr_t<T, N>::resource_ptr_t(resource::resource_ptr_t<U, N>& o
 
 template<typename T, size_t N>
 template<typename U>
-resource::resource_ptr_t<T, N>& resource::resource_ptr_t<T, N>::operator=(resource_ptr_t<U, N>& other) requires (is_copyable<U>)
+resource::locked_ptr_t<T, N>& resource::locked_ptr_t<T, N>::operator=(locked_ptr_t<U, N>& other) requires (is_copyable<U>)
 {
 	if (ptr == nullptr)
 		unlock();
@@ -172,7 +172,7 @@ resource::resource_ptr_t<T, N>& resource::resource_ptr_t<T, N>::operator=(resour
 
 template<typename T, size_t N>
 template<typename U> 
-resource::resource_ptr_t<T, N>::resource_ptr_t(resource::resource_ptr_t<U, N>&& other) requires (is_movable<U>)
+resource::locked_ptr_t<T, N>::locked_ptr_t(resource::locked_ptr_t<U, N>&& other) requires (is_movable<U>)
 { 
 	std::swap(pl, other.pl);
 	std::swap(ptr, other.ptr);
@@ -180,7 +180,7 @@ resource::resource_ptr_t<T, N>::resource_ptr_t(resource::resource_ptr_t<U, N>&& 
 
 template<typename T, size_t N>
 template<typename U>
-resource::resource_ptr_t<T, N>& resource::resource_ptr_t<T, N>::operator=(resource_ptr_t<U, N>&& other) requires (is_movable<U>)
+resource::locked_ptr_t<T, N>& resource::locked_ptr_t<T, N>::operator=(locked_ptr_t<U, N>&& other) requires (is_movable<U>)
 {
 	std::swap(pl, other.pl);
 	std::swap(ptr, other.ptr);
@@ -189,31 +189,31 @@ resource::resource_ptr_t<T, N>& resource::resource_ptr_t<T, N>::operator=(resour
 }
 
 template<typename T, size_t N>
-T& resource::resource_ptr_t<T, N>::operator*()
+T& resource::locked_ptr_t<T, N>::operator*()
 {
 	return *ptr;
 }
 
 template<typename T, size_t N>
-const T& resource::resource_ptr_t<T, N>::operator*() const
+const T& resource::locked_ptr_t<T, N>::operator*() const
 {
 	return *ptr;
 }
 
 template<typename T, size_t N>
-T* resource::resource_ptr_t<T, N>::operator->()
+T* resource::locked_ptr_t<T, N>::operator->()
 {
 	return ptr;
 }
 
 template<typename T, size_t N>
-const T* resource::resource_ptr_t<T, N>::operator->() const
+const T* resource::locked_ptr_t<T, N>::operator->() const
 {
 	return ptr;
 }
 
 template<typename T, size_t N>
-void resource::resource_ptr_t<T, N>::lock(priority p) 
+void resource::locked_ptr_t<T, N>::lock(priority p) 
 {
 	std::unique_lock lk(pl->mtx);
 
@@ -254,7 +254,7 @@ void resource::resource_ptr_t<T, N>::lock(priority p)
 }
 
 template<typename T, size_t N>
-bool resource::resource_ptr_t<T, N>::try_lock(priority p) 
+bool resource::locked_ptr_t<T, N>::try_lock(priority p) 
 {
 	std::unique_lock lk(pl->mtx);
 
@@ -274,7 +274,7 @@ bool resource::resource_ptr_t<T, N>::try_lock(priority p)
 }
 
 template<typename T, size_t N>
-void resource::resource_ptr_t<T, N>::unlock() 
+void resource::locked_ptr_t<T, N>::unlock()
 {
 	std::lock_guard lk(pl->mtx);
 	

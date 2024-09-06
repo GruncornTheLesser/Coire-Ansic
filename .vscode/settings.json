@@ -1,12 +1,5 @@
 {
 	"C_Cpp.default.cppStandard": "c++23",
-	"C_Cpp.default.cStandard": "c23",
-	
-	"workbench.colorCustomizations" : { 
-		"editorError.border": "#ffffff00",
-		"editorError.foreground": "#ffffff",
-		"editorError.background": "#ff000020",
-	},
 	"files.associations": {
 		"traits": "cpp",
 		"array": "cpp",
@@ -41,7 +34,7 @@
 		"random": "cpp",
 		"ratio": "cpp",
 		"string_view": "cpp",
-		"system_error": "cpp",
+		"pipeline_error": "cpp",
 		"tuple": "cpp",
 		"utility": "cpp",
 		"initializer_list": "cpp",
@@ -85,9 +78,8 @@
 		"type_traits": "cpp",
 		"*.tpp": "cpp",
 		"compare": "cpp",
-		"list": "cpp"
-	},
-	"todo-tree.tree.showCountsInTree": false,
-	"todo-tree.tree.showBadges": true,
-	//"C_Cpp.default.compilerPath": "C:\\Program Files (x86)\\MSYS\\mingw64\\bin\\g++.exe",
+		"list": "cpp",
+		"set": "cpp",
+		"system_error": "cpp"
+	}
 }

@@ -1,149 +1,174 @@
 #pragma once
 #include <type_traits>
-#include "../util/tuple_util.h"
+#include "../tuple_util/tuple_util.h"
+#include "../util/attribute.h"
 
 namespace resource::traits {
-	// if a resource has the alias trait the resource describes an alias for the type defined in resource_alias
-	template<typename T, typename=std::void_t<>> 
-	struct has_alias : std::false_type { };
-	template<typename T> 
-	struct has_alias<T, std::void_t<typename T::resource_alias>> : std::true_type { };
-	template<typename T> 
-	static constexpr bool has_alias_v = has_alias<T>::value;
-	
-	template<typename T, typename=std::void_t<>> 
-	struct get_alias { using type = T; };
-	template<typename T> 
-	struct get_alias<T, std::enable_if_t<std::is_const_v<T> && has_alias_v<T>>> : std::type_identity<const typename T::resource_alias> { };
-	template<typename T> 
-	struct get_alias<T, std::enable_if_t<!std::is_const_v<T> && has_alias_v<T>>> : std::type_identity<typename T::resource_alias> { };
+	DECL_ATTRIB_NAMESPACE
+	DECL_TYPE_ATTRIB(resource_alias, T)
+	DECL_TYPE_ATTRIB(resource_type, std::remove_cv_t<T>)
+	DECL_TYPE_ATTRIB(resource_lockset, std::tuple<T>)
+	DECL_VALUE_ATTRIB(int, resource_inst_count, 1)
+	DECL_VALUE_ATTRIB(int, resource_lock_level, 0)
+
+
+	// the resource alias is a type used to identify the 
+	template<typename T>
+	struct get_alias : util::copy_cv<get_attribute_t<T, attribute::resource_alias>, T> { };
 	template<typename T> 
 	using get_alias_t = get_alias<T>::type;
-	
-
-	// instance_count describes the max number of acquirable resources
-	// defaults to 1
-	template<typename T, typename=std::void_t<>>
-	struct has_instance_count : std::false_type { };
-	template<typename T>
-	struct has_instance_count<T, std::void_t<typename T::resource_instance_count>> : std::true_type { };
-	template<typename T>
-	static constexpr bool has_instance_count_v = has_instance_count<T>::value;
-
-	template<typename T, typename=std::void_t<>>  
-	struct get_instance_count : std::integral_constant<int, 1> { };
-	template<typename T>
-	struct get_instance_count<T, std::enable_if_t<!std::is_same_v<get_alias_t<T>, T>>>
-	 : get_instance_count<get_alias_t<T>> { }; 
-	template<typename T>
-	struct get_instance_count<T, std::enable_if_t<std::is_same_v<get_alias_t<T>, T> && has_instance_count_v<T>>>
-	 : std::integral_constant<int, T::resource_instance_count> { };
-	template<typename T> 
-	static constexpr int get_instance_count_v = get_instance_count<T>::value;
-
 
 	// resource type describes the type of value stored. 
-	// eg res_A { using resource_type = int; }; int res_type = reg.get_resource<res_A>();  
-	template<typename T, typename=std::void_t<>> 
-	struct has_type : std::false_type { };
-	template<typename T> 
-	struct has_type<T, std::void_t<typename T::resource_type>> : std::true_type { };
-	template<typename T> 
-	static constexpr bool has_type_v = has_type<T>::value;
-	
+	// eg res_A { using resource_type = int; }; int res_type = reg.get_resource<res_A>();
 	template<typename T, typename=std::void_t<>>  
-	struct get_type : std::type_identity<T> { };
+	struct get_type : get_attribute<get_alias_t<T>, attribute::resource_type> { };
 	template<typename T>
-	struct get_type<T, std::enable_if_t<!std::is_same_v<get_alias_t<T>, T>>>
-	 : util::propagate_const<T, util::eval_<get_alias, get_type>::template type> { };
+	struct get_type<T, std::enable_if_t<has_attribute_v<T, attribute::resource_type>>>
+	 : get_attribute<T, attribute::resource_type> { };
 	template<typename T>
-	struct get_type<T, std::enable_if_t<std::is_same_v<get_alias_t<T>, T> && has_type_v<T>>>
-	 : std::type_identity<typename T::resource_type> { };
-	template<typename T> 
 	using get_type_t = get_type<T>::type;
-	
 
-	// a resource lockset describes a set of resources that are also locked when locking T. 
-	// T does not need to be a resource it could also be an operation. T must appear in T::lockset
-	// to be locked. any qualifiers on the types in lockset are propagated through.
-	template<typename T, typename=std::void_t<>> 
-	struct has_lockset : std::false_type { };
-	template<typename T> 
-	struct has_lockset<T, std::void_t<typename T::resource_lockset>> : std::true_type { };
-	template<typename T> 
-	static constexpr bool has_lockset_v = has_lockset<T>::value;
-	
-	template<typename T, typename callset_T=std::tuple<T>, typename=void>
-	struct get_lockset;
-	template<typename T, typename callset>
-	struct get_lockset<T, callset, std::enable_if_t<!util::is_tuple_v<T> && !has_lockset_v<T>>>
-	 : std::type_identity<std::tuple<T>> { };
-	template<typename T, typename callset>
-	struct get_lockset<T, callset, std::enable_if_t<!util::is_tuple_v<T> && has_lockset_v<T>>> 
-	 : get_lockset<typename T::resource_lockset, callset> { };
-	template<typename Tup, typename callset>
-	struct get_lockset<Tup, callset, std::enable_if_t<util::is_tuple_v<Tup>>> 
-	 : util::eval<Tup, 
-	 	util::eval_each_< // for each
-			util::propagate_const_each_< // if const add const to each
-				util::eval_if_<util::element_of_<callset>::template type, // check if looping
-					util::wrap_<std::tuple>::template type, // if looping
-					util::add_type_args_<get_lockset, // else recursive call
-						util::concat_t<std::tuple<callset, Tup>> // add Ts to callset so not called again
-					>::template type
-				>::template type
-			>::template type
-		>::template type,
-		util::concat> { }; // concat together
-	template<typename T> using get_lockset_t = typename get_lockset<T>::type;
 
-	
+
+	// instance_count describes the max number of acquirable resources
+	// defaults to 1.
+	template<typename T, typename=std::void_t<>>  
+	struct get_inst_count : get_attribute<get_alias_t<T>, attribute::resource_inst_count> { };
+	template<typename T>
+	struct get_inst_count<T, std::enable_if_t<has_attribute_v<T, attribute::resource_inst_count>>>
+	 : get_attribute<T, attribute::resource_inst_count> { };
+	template<typename T> 
+	static constexpr auto get_inst_count_v = get_inst_count<T>::value;
+
+
 	// lock level determines the order in which resources are locked, levels are locked in order. // if 2 resources  
-	// have equal lock levels then resources lock in unspecified yet consistent order(secretly alphabetical). 
+	// have equal lock levels then resources lock in unspecified yet consistent order(secretly alphabetical).
 	// lock level defaults to 0.
-	template<typename T, typename=std::void_t<>> 
-	struct has_lock_level : std::false_type { };
+	template<typename T, typename=std::void_t<>>  
+	struct get_lock_level : get_attribute<get_alias_t<T>, attribute::resource_lock_level> { };
+	template<typename T>
+	struct get_lock_level<T, std::enable_if_t<has_attribute_v<T, attribute::resource_lock_level>>>
+	 : get_attribute<T, attribute::resource_lock_level> { };
 	template<typename T> 
-	struct has_lock_level<T, std::void_t<typename T::resource_lock_level>> : std::true_type { };
-	template<typename T> 
-	static constexpr bool has_lock_level_v = has_lock_level<T>::value;
+	static constexpr auto get_lock_level_v = get_lock_level<T>::value;
+
+
+
+	// a resource lockset describes a set of resources that are also locked when locking T in a resource set. 
+	// T does not need to be a resource. if T does not appear in T::lockset to be locked, it wont be locked. 
+	// any qualifiers on the types in lockset are propagated through.
+
+	template<typename T, typename callset_T=std::tuple<>, typename=std::void_t<>>
+	struct get_lockset;
+
+	template<typename T, typename callset_T>
+	struct get_lockset<T, callset_T, std::enable_if_t<has_attribute_v<T, attribute::resource_lockset> && !util::pred::element_of_v<T, callset_T, util::cmp::is_ignore_cv_same>>>
+	 : util::propagate_cv_each<T, util::add_arg_<get_attribute, attribute::resource_lockset>::template type, util::assert_<util::pred::is_tuple>::template type, // get resource set
+		util::eval_each_<util::add_arg_<get_lockset, util::append_t<callset_T, T>>::template type>::template type, util::concat> { };
+
+	template<typename T, typename callset_T>
+	struct get_lockset<T, callset_T, std::enable_if_t<!has_attribute_v<T, attribute::resource_lockset> || util::pred::element_of_v<T, callset_T, util::cmp::is_ignore_cv_same>>>
+	 : std::type_identity<std::tuple<T>> { };
 	
-	template<typename T, typename=std::void_t<>> 
-	struct get_lock_level { static constexpr int value = 0; };
-	template<typename T> 
-	struct get_lock_level<T, std::void_t<decltype(T::lock_level)>> { static constexpr int value = T::lock_level; };
-	template<typename T> 
-	static constexpr int get_lock_level_v = get_lock_level<T>::value;
+	template<typename T>
+	using get_lockset_t = typename get_lockset<T>::type;
+	
+	/*
+	get_lockset<res_A, std::tuple<>> -> std::tuple<res_A>
+	*/
+	/*
+	get_lockset<res_B, std::tuple<>
+		get_lockset<std::tuple<int, float>, std::tuple<res_B>>
+			get_lockset<int, std::tuple<res_B>> -> std::tuple<int>
+			get_lockset<float, std::tuple<res_B>> -> std::tuple<float>
+
+	*/
+	/*
+	get_lockset<res_C, std::tuple<>> 
+		get_lockset<tuple<res_C, res_B>, std::tuple<res_C>>
+			get_lockset<res_C, std::tuple<res_C>> -> std::tuple<res_C>
+			get_lockset<res_B, std::tuple<res_C>> -> std::tuple<int, float>
+		concat -> std::tuple<res_C, int, float>
+	*/
 
 
-	template<typename T, typename=std::void_t<>> 
-	struct is_resource : std::true_type { }; // TODO update me to a new definition of a resource
-	template<typename T> 
-	struct is_resource<T, std::void_t<
-		decltype(std::declval<T>().acquire()), decltype(std::declval<const T>().acquire()),
-		decltype(std::declval<T>().release()), decltype(std::declval<const T>().release())>>
-		: std::true_type { };
-	template<typename T> 
-	static constexpr bool is_v = is_resource<T>::value;
-	template<typename T> 
+
+
+	template<typename T, typename=void>
+	struct is_resource : std::negation<std::is_same<get_alias_t<T>, void>> { };
+	template<typename T>
+	static constexpr bool is_resource_v = is_resource<T>::value;
+	template<typename T>
 	concept resource_class = is_resource<T>::value;
 
 
-
-	template<typename T> 
-	struct is_resource_key : is_resource<get_type_t<T>> { }; 
-	template<typename T> 
-	static constexpr bool is_resource_key_v = is_resource_key<T>::value;
-	template<typename T> 
-	concept resource_key_class = is_resource_key<T>::value;
-
-
-
 	template<typename T, typename lock_T> 
-	struct is_accessible : util::is_subset<get_lockset_t<T>, get_lockset_t<lock_T>, util::cmp::is_const_accessible>
+	struct is_accessible : util::pred::is_subset<get_lockset_t<T>, get_lockset_t<lock_T>, util::cmp::is_const_accessible>
 	{ };
 	template<typename T, typename lock_T> 
 	static constexpr bool is_accessible_v = is_accessible<T, lock_T>::value;
 	template<typename T, typename lock_T> 
 	concept accessible_class = is_accessible<T, lock_T>::value;
 }
+
+
+
+//#if _DEBUG
+namespace resource::test
+{
+	struct res_A { };
+	using res_A_type = resource::traits::get_type_t<res_A>;
+	using res_A_alias = resource::traits::get_alias_t<res_A>;
+	using res_A_lockset = resource::traits::get_lockset_t<res_A>;
+	static constexpr int res_A_inst_count = resource::traits::get_inst_count_v<res_A>;
+	static constexpr int res_A_lock_level = resource::traits::get_lock_level_v<res_A>;
+	struct res_B 
+	{ 
+		using resource_type = int;
+		using resource_lockset = std::tuple<int, float>;
+		static constexpr int resource_lock_level = 1;
+		static constexpr int resource_inst_count = 2;
+	};
+	
+	using res_B_type = resource::traits::get_type_t<res_B>;
+	using res_B_alias = resource::traits::get_alias_t<res_B>;
+	using res_B_lockset = resource::traits::get_lockset_t<res_B>;
+	static constexpr int res_B_inst_count = resource::traits::get_inst_count_v<res_B>;
+	static constexpr int res_B_lock_level = resource::traits::get_lock_level_v<res_B>;
+
+	struct res_C 
+	{ 
+		using resource_alias = res_B;
+		using resource_lockset = std::tuple<res_C, res_B>;
+	};
+	using res_C_type = resource::traits::get_type_t<res_C>;
+	using res_C_alias = resource::traits::get_alias_t<res_C>;
+	using res_C_lockset = typename resource::traits::get_lockset_t<res_C>;
+	static constexpr int res_C_inst_count = resource::traits::get_inst_count_v<res_C>;
+	static constexpr int res_C_lock_level = resource::traits::get_lock_level_v<res_C>;
+
+	struct res_D
+	{
+		using resource_lockset = std::tuple<const res_B>;
+	};
+	
+	using res_D_lockset = typename resource::traits::get_lockset_t<res_D>;
+
+
+	static_assert(std::is_same_v<resource::traits::get_type_t<res_A>, res_A>, "failed default resource type");
+	static_assert(std::is_same_v<resource::traits::get_alias_t<res_A>, res_A>, "failed default resource alias");
+	static_assert(std::is_same_v<resource::traits::get_lockset_t<res_A>, std::tuple<res_A>>, "failed default resource lockset");
+	static_assert(resource::traits::get_inst_count_v<res_A> == 1, "failed default resource instance count");
+	static_assert(resource::traits::get_lock_level_v<res_A> == 0, "failed default resource lock level");
+
+	static_assert(std::is_same_v<resource::traits::get_type_t<res_B>, int>, "failed assigned for resource type");
+	static_assert(std::is_same_v<resource::traits::get_lockset_t<res_B>, std::tuple<int, float>>, "failed assigned resource lockset");
+	static_assert(resource::traits::get_lock_level_v<res_B> == 1, "failed assigned resource lock level");
+	static_assert(resource::traits::get_inst_count_v<res_B> == 2, "failed assigned resource instance count");
+
+	static_assert(std::is_same_v<resource::traits::get_type_t<res_C>, int>, "failed alias pass through for resource type");
+	static_assert(resource::traits::get_lock_level_v<res_C> == 1, "failed alias pass through resource lock level");
+	static_assert(resource::traits::get_inst_count_v<res_C> == 2, "failed alias pass through resource instance count");
+	static_assert(std::is_same_v<resource::traits::get_lockset_t<res_C>, std::tuple<res_C, int, float>>, "failed self inclusive resource lockset");
+}
+//#endif

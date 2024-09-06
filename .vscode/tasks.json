@@ -4,7 +4,15 @@
 			"type": "cppbuild",
 			"label": "g++ build",
 			"command": "g++",
-			"args":[ "main.cpp", "-g", "-o", "${workspaceFolderBasename}.exe", "-std=c++23", "-fdiagnostics-color=always", "-fdiagnostics-show-location=once" ],
+			"args":[ "main.cpp", "-g", // -g is for debugging
+				"-o", "${workspaceFolderBasename}.exe", // output file
+				"-std=c++23", // c++ version
+				// "--sys-root=", // use as root dir for headers and libraries
+				// "-I /path/" // add to compiler's search path written from root of the filesystem
+				"-Werror",
+				"-ftemplate-depth=100", 
+				"-fdiagnostics-color=always", 
+				"-fdiagnostics-show-location=once" ],
 			"options": {
 				"cwd": "${workspaceFolder}"
 			},

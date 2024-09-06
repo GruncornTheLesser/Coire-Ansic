@@ -1,5 +1,5 @@
 #pragma once 
-#include "../util/tuple_util.h"
+#include "../tuple_util/tuple_util.h"
 #include "traits.h"
 #include "registry.h"
 #include "pool.h"
@@ -26,11 +26,11 @@ namespace resource {
 
 	template<typename ... Ts>
 	struct set_t {
-		using pointer_set = std::tuple<resource_ptr<Ts>...>;
+		using pointer_set = std::tuple<locked_ptr<Ts>...>;
+		using resource_lockset = std::tuple<Ts...>; 
 		
-		template<typename base_T>
-		set_t(base_T& base, priority p = priority::NONE) : ptrs(base.template get_resource<Ts>(p)...)
-		{ }
+		template<typename ... Us>
+		set_t(resource::registry<Us...>& base, priority p = priority::NONE) : ptrs(base.template get_resource<Ts>(p)...) { }
 
 		void lock(priority p = priority::MEDIUM)
 		{
@@ -42,11 +42,11 @@ namespace resource {
 			std::apply([](auto& ... ptr) { (ptr.unlock(), ...); }, ptrs);
 		}
 
-		template<typename T> requires (traits::is_accessible_v<T, std::tuple<Ts...>>)
+		template<typename T> // requires (traits::is_accessible_v<T, std::tuple<Ts...>>)
 		traits::get_type_t<T>& get_resource() 
 		{
-			static constexpr int I = util::find_v<std::tuple<Ts...>, util::compare_to_<T, 
-				util::cmp::is_const_accessible>::template type>;
+			static constexpr int I = util::find_v<std::tuple<Ts...>, util::cmp::to_<T, 
+				util::cmp::is_ignore_cv_same>::template type>;
 			return *std::get<I>(ptrs);
 		}
 
@@ -58,14 +58,16 @@ namespace resource {
 
 	template<typename ... Ts>
 	struct set_builder : util::eval<std::tuple<Ts...>, 
-		traits::get_lockset, 
-		util::unique_priority_<util::cmp::is_ignore_const_same, 
-			util::cmp::less_<std::is_const>::template type>::template type,
-		util::sort_<util::cmp::priority_list_<
-				util::cmp::less_<traits::get_lock_level>::template type,
-				util::cmp::less_<util::get_type_ID>::template type
-			>::template type
+		util::eval_each_<traits::get_lockset>::template type, 
+		util::concat, 
+		util::unique_priority_<
+			util::cmp::is_ignore_const_same, 
+			util::cmp::lt_<std::is_const>::template type
 		>::template type,
+		util::sort_<util::cmp::priority_<
+			util::cmp::lt_<traits::get_lock_level>::template type, 
+			util::cmp::lt_<util::get_type_ID>::template type
+		>::template type>::template type,
 		util::rewrap_<set_t>::template type
 		> { };
 
