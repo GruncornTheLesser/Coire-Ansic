@@ -1,13 +1,6 @@
 #pragma once
-#include <type_traits>
-#include <variant>
-#include <tuple>
 #include "../tuple_util/tuple_util.h"
-#include "../util/type_name.h"
-#include "../util/paged_vector.h"
-#include "../util/sparse_map.h"
 #include "../util/attribute.h"
-#include "versioner.h"
 
 // TODO: view args
 // concepts - select, from, where
@@ -15,16 +8,15 @@
 // view_indexable, view_iterable
 
 
-// traits attribute
-
-// default types
+// forward declare default types
 namespace ecs
 {
 	template<typename T> struct basic_manager;
 	template<typename T> struct basic_indexer;
 	template<typename T> struct basic_storage;
-	template<typename T> struct handle_manager;
+
 	struct entity;
+	template<typename T> struct handle_manager;
 }
 
 namespace ecs::tags 
@@ -39,17 +31,37 @@ namespace ecs::tags
 namespace ecs::traits 
 {
 	DECL_ATTRIB_NAMESPACE
-	
-	DECL_TYPE_ATTRIB(component_handle, void) //  entity
-	DECL_TYPE_ATTRIB(component_manager, void) // basic_manager<T>
-	DECL_TYPE_ATTRIB(component_indexer, void) // basic_indexer<T>
-	DECL_TYPE_ATTRIB(component_storage, void) // basic_storage<T>
 
-	DECL_TEMPLATE_ATTRIB(handle_alias, void)
-	DECL_TEMPLATE_ATTRIB(manager_alias, void)
-	DECL_TEMPLATE_ATTRIB(indexer_alias, void)
-	DECL_TEMPLATE_ATTRIB(storage_alias, void)
 	DECL_TYPE_ATTRIB(component_tag, tags::basictype<T>)
+
+	DECL_TEMPLATE_ATTRIB(handle_alias,  entity)
+	DECL_TEMPLATE_ATTRIB(manager_alias, basic_manager<T>)
+	DECL_TEMPLATE_ATTRIB(indexer_alias, basic_indexer<T>)
+	DECL_TEMPLATE_ATTRIB(storage_alias, basic_storage<T>)
+	
+	DECL_TYPE_ATTRIB(component_handle,  EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::handle_alias<T>>))
+	DECL_TYPE_ATTRIB(component_manager, EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::manager_alias<T>>))
+	DECL_TYPE_ATTRIB(component_indexer, EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::indexer_alias<T>>))
+	DECL_TYPE_ATTRIB(component_storage, EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::storage_alias<T>>))
+}
+
+namespace ecs::traits {
+	template<typename T, typename=std::void_t<>> struct get_tag : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_tag>, T> { };
+	template<typename T> struct get_tag<T, std::enable_if_t<std::is_same_v<get_attribute_t<T, attribute::component_tag>, tags::resource>>> : std::type_identity<T> { };
+	template<typename T> using get_tag_t = typename get_tag<T>::type;
+
+	template<typename T> struct get_handle : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_handle>, T> { };
+	template<typename T> using get_handle_t = typename get_handle<T>::type;
+
+	template<typename T> struct get_manager : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_manager>, T> { };
+	template<typename T> using get_manager_t = typename get_manager<T>::type;
+
+	template<typename T> struct get_indexer : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_indexer>, T> { };
+	template<typename T> using get_indexer_t = typename get_indexer<T>::type;
+
+	template<typename T> struct get_storage : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_storage>, T> { };
+	template<typename T> using get_storage_t = typename get_storage<T>::type;
+
 }
 
 namespace ecs::traits 
@@ -81,84 +93,12 @@ namespace ecs::traits
 	template<typename T> static constexpr bool is_storage_v = is_storage<T>::value;
 }
 
-namespace ecs::traits {
-	template<typename T, typename=std::void_t<>> struct get_tag
-	 : get_attribute<T, attribute::component_tag> { };
-	template<typename T> struct get_tag<T, std::enable_if_t<std::is_same_v<get_attribute_t<T, attribute::component_tag>, tags::resource>>> : std::type_identity<T> { };
-	template<typename T> using get_tag_t = typename get_tag<T>::type;
-
-
-
-	template<typename T, typename=std::void_t<>> struct get_handle
-	 : std::type_identity<ecs::entity> {
-		static_assert(is_handle_v<ecs::entity>, "invalid default handle");
-	};
-	template<typename T> struct get_handle<T, std::enable_if_t<!has_attribute_v<T, attribute::component_handle> && has_attribute_v<T, attribute::component_tag>>>
-	 : get_template_attribute<get_attribute_t<T, attribute::component_tag>, attribute::handle_alias<T>> {
-		static_assert(is_handle_v<get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::handle_alias<T>>>, "invalid component handle");
-	};
-	template<typename T> struct get_handle<T, std::enable_if_t<has_attribute_v<T, attribute::component_handle>>>
-	 : get_attribute<T, attribute::component_handle> {
-		static_assert(is_handle_v<get_attribute_t<T, attribute::component_handle>>, "invalid tag handle");
-	};
-	template<typename T> using get_handle_t = typename get_handle<T>::type;
-
-
-
-	template<typename T, typename=std::void_t<>> struct get_manager
-	 : std::type_identity<ecs::basic_manager<T>> {
-		static_assert(is_manager_v<ecs::basic_manager<T>>, "invalid default manager");
-	};
-	template<typename T> struct get_manager<T, std::enable_if_t<!has_attribute_v<T, attribute::component_manager> && has_attribute_v<T, attribute::component_tag>>>
-	 : get_template_attribute<get_attribute_t<T, attribute::component_tag>, attribute::manager_alias<T>> {
-		static_assert(is_manager_v<get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::manager_alias<T>>>, "invalid component manager");
-	};
-	template<typename T> struct get_manager<T, std::enable_if_t<has_attribute_v<T, attribute::component_manager>>>
-	 : get_attribute<T, attribute::component_manager> {
-		static_assert(is_manager_v<get_attribute_t<T, attribute::component_manager>>, "invalid tag manager");
-	};
-	template<typename T> using get_manager_t = typename get_manager<T>::type;
-
-
-
-	template<typename T, typename=std::void_t<>> struct get_indexer
-	 : std::type_identity<ecs::basic_indexer<T>> {
-		static_assert(is_indexer_v<ecs::basic_indexer<T>>, "invalid default indexer");
-	};
-	template<typename T> struct get_indexer<T, std::enable_if_t<!has_attribute_v<T, attribute::component_indexer> && has_attribute_v<T, attribute::component_tag>>>
-	 : get_template_attribute<get_attribute_t<T, attribute::component_tag>, attribute::indexer_alias<T>> {
-		static_assert(is_indexer_v<get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::indexer_alias<T>>>, "invalid component indexer");
-	};
-	template<typename T> struct get_indexer<T, std::enable_if_t<has_attribute_v<T, attribute::component_indexer>>>
-	 : get_attribute<T, attribute::component_indexer> {
-		static_assert(is_indexer_v<get_attribute_t<T, attribute::component_indexer>>, "invalid tag indexer");
-	};
-	template<typename T> using get_indexer_t = typename get_indexer<T>::type;
-
-
-
-
-	template<typename T, typename=std::void_t<>> struct get_storage
-	 : std::type_identity<ecs::basic_storage<T>> {
-		static_assert(is_storage_v<ecs::basic_storage<T>>, "invalid default storage");
-	};
-	template<typename T> struct get_storage<T, std::enable_if_t<!has_attribute_v<T, attribute::component_storage> && has_attribute_v<T, attribute::component_tag>>>
-	 : get_template_attribute<get_attribute_t<T, attribute::component_tag>, attribute::storage_alias<T>> {
-		static_assert(is_storage_v<get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::storage_alias<T>>>, "invalid component storage");
-	};
-	template<typename T> struct get_storage<T, std::enable_if_t<has_attribute_v<T, attribute::component_storage>>>
-	 : get_attribute<T, attribute::component_storage> {
-		static_assert(is_storage_v<get_attribute_t<T, attribute::component_storage>>, "invalid tag storage");
-	};
-	template<typename T> using get_storage_t = typename get_storage<T>::type;
-}
-
 namespace ecs 
 {
+	template<typename T> using handle = typename traits::get_handle<T>::type;
 	template<typename T> using manager = typename traits::get_manager<T>::type;
 	template<typename T> using indexer = typename traits::get_indexer<T>::type;
 	template<typename T> using storage = typename traits::get_storage<T>::type;
-	template<typename T> using handle = typename traits::get_handle<T>::type;
 }
 
 

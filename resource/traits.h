@@ -12,45 +12,29 @@ namespace resource::traits {
 	DECL_VALUE_ATTRIB(int, resource_lock_level, 0)
 
 
-	// the resource alias is a type used to identify the 
-	template<typename T>
-	struct get_alias : util::copy_cv<get_attribute_t<T, attribute::resource_alias>, T> { };
-	template<typename T> 
-	using get_alias_t = get_alias<T>::type;
+	// the resource alias is a type used to identify the resource, a alias can be shared between multiple type
+	// eg res_A { using resource_alias = int; }; res_B { using resource_alias = int; }; &reg.get_resource<res_A>() == &reg.get_resource<res_B>()
+	template<typename T> struct get_alias : util::copy_cv<get_attribute_t<T, attribute::resource_alias>, T> { };
+	template<typename T> using get_alias_t = get_alias<T>::type;
 
 	// resource type describes the type of value stored. 
-	// eg res_A { using resource_type = int; }; int res_type = reg.get_resource<res_A>();
-	template<typename T, typename=std::void_t<>>  
-	struct get_type : get_attribute<get_alias_t<T>, attribute::resource_type> { };
-	template<typename T>
-	struct get_type<T, std::enable_if_t<has_attribute_v<T, attribute::resource_type>>>
-	 : get_attribute<T, attribute::resource_type> { };
-	template<typename T>
-	using get_type_t = get_type<T>::type;
+	// eg res_A { using resource_type = int; }; int res = reg.get_resource<res_A>();
+	template<typename T> struct get_type : get_attribute<get_alias_t<T>, attribute::resource_type> { };
+	template<typename T> using get_type_t = get_type<T>::type;
 
 
 
-	// instance_count describes the max number of acquirable resources
-	// defaults to 1.
-	template<typename T, typename=std::void_t<>>  
-	struct get_inst_count : get_attribute<get_alias_t<T>, attribute::resource_inst_count> { };
-	template<typename T>
-	struct get_inst_count<T, std::enable_if_t<has_attribute_v<T, attribute::resource_inst_count>>>
-	 : get_attribute<T, attribute::resource_inst_count> { };
-	template<typename T> 
-	static constexpr auto get_inst_count_v = get_inst_count<T>::value;
+	// inst_count describes the max number of acquirable resources, defaults to 1.
+	// eg res_A { static constexpr size_t inst_count = 3; }; auto lock_ref_1 = reg.get_resource<res_A>(); 
+	template<typename T> struct get_inst_count : get_attribute<get_alias_t<T>, attribute::resource_inst_count> { };
+	template<typename T> static constexpr auto get_inst_count_v = get_inst_count<T>::value;
 
 
 	// lock level determines the order in which resources are locked, levels are locked in order. // if 2 resources  
 	// have equal lock levels then resources lock in unspecified yet consistent order(secretly alphabetical).
 	// lock level defaults to 0.
-	template<typename T, typename=std::void_t<>>  
-	struct get_lock_level : get_attribute<get_alias_t<T>, attribute::resource_lock_level> { };
-	template<typename T>
-	struct get_lock_level<T, std::enable_if_t<has_attribute_v<T, attribute::resource_lock_level>>>
-	 : get_attribute<T, attribute::resource_lock_level> { };
-	template<typename T> 
-	static constexpr auto get_lock_level_v = get_lock_level<T>::value;
+	template<typename T> struct get_lock_level : get_attribute<get_alias_t<T>, attribute::resource_lock_level> { };
+	template<typename T> static constexpr auto get_lock_level_v = get_lock_level<T>::value;
 
 
 

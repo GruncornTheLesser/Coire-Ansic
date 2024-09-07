@@ -21,7 +21,7 @@ namespace resource
 	class pool_t;
 
 	template<typename T>
-	using pool = pool_t<std::remove_cv_t<traits::get_type_t<T>>, traits::get_inst_count_v<T>>;
+	using pool = util::copy_cv_t<pool_t<std::remove_cv_t<traits::get_type_t<T>>, traits::get_inst_count_v<T>>, T>;
 
 	template<typename T, size_t N>
 	class pool_t 
@@ -86,7 +86,7 @@ namespace resource
 	{
 		using pool_type = pool_t<std::remove_cv_t<T>, N>;
 
-		// if volatile = 1
+		
 		static constexpr enum { VOLATILE, CONSTANT, EXCLUSIVE } access = std::is_volatile_v<T> ? VOLATILE : (std::is_const_v<T> ? CONSTANT : EXCLUSIVE);
 		
 		template<typename U>

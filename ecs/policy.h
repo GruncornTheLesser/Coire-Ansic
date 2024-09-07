@@ -133,7 +133,7 @@ namespace ecs::policy
 	// updates in same pipeline
 	struct immediate 
 	{
-		template<typename T> 
+		template<typename T>
 		struct syncer 
 		{ 
 			using resource_lockset = std::tuple<const manager<T>, indexer<T>, storage<T>>;

@@ -27,8 +27,13 @@ struct comp_A {
 	float a; 
 	using component_tag = ecs::tags::basictype<comp_A>;
 };
-struct comp_B { float b; };
 
+
+struct comp_B { float b; };
+using test_1 = ecs::traits::get_handle_t<const comp_B>;
+using test_2 = ecs::traits::get_manager_t<const comp_B>;
+using test_3 = ecs::traits::get_indexer_t<const comp_B>;
+using test_4 = ecs::traits::get_storage_t<const comp_B>;
 
 int main() 
 {

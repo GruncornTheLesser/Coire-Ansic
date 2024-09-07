@@ -1,6 +1,7 @@
 #pragma once
 #include <type_traits>
 
+#define EXPAND(...) __VA_ARGS__
 #define DECL_ATTRIB_NAMESPACE \
 template<typename T, typename Attrib_T, typename=std::void_t<>> struct get_attribute; \
 template<typename T, typename Attrib_T> using get_attribute_t = typename get_attribute<T, Attrib_T>::type; \
