@@ -59,21 +59,27 @@ int main()
 */
 
 #include "util/paged_vector.h"
+#include "util/chain_vector.h"
 #include <iostream>
 #include <ranges>
 
 
 
 using paged_vec = util::paged_vector<int, std::allocator<int>, std::allocator<std::span<int, 4u>>>;
+using chain_vec = util::chain_vector<int, std::allocator<int>, std::allocator<std::span<int, 4u>>>;
+
 //static_assert(std::ranges::range<paged_vec>, "");
 
 
 
 int main() {
 	// paged_vector(Alloc_T&& elem_alloc={}, Page_Alloc_T&& page_alloc={}); 
-	{ 
+	{
 		paged_vec vec;
-
+		
+		paged_vec vec_alloc1{ std::allocator<int>(), std::allocator<std::span<int, 4u>>() };
+		paged_vec vec_alloc1{ std::allocator<int>(), std::allocator<std::span<int, 4u>>() };
+		
 		auto vec_begin = std::ranges::begin(vec);
 		auto vec_end = std::ranges::end(vec);
 
@@ -158,6 +164,11 @@ int main() {
 
 		// void swap(paged_vector& other);
 		vec5.swap(vec3);
+
+		//chain_vec vec6 = vec5;
+		
+		
+		//paged_vec::iterator paged_it 
 	}
 	
 
@@ -165,20 +176,19 @@ int main() {
 
 
 
-/*
-	using chain_vec = ecsliter::chain_vector<char, std::allocator<ecsliter::chain_vector_element<char, 4u>>, std::allocator<ecsliter::chain_vector_page<char, 4u>>>;
 
-	chain_vec vec = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l' };
+	//using chain_vec = util::chain_vector<char, std::allocator<util::chain_vector_element<char, 4u>>, std::allocator<util::chain_vector_page<char, 4u>>>;
+	//chain_vec vec = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l' };
 	
-	vec.chain().push_back(0);
-	vec.chain().push_back(3);
-	vec.chain().push_back(8);
-	vec.chain().push_back(3);
-	vec.chain().push_back(5);
-	vec.chain().push_back(10);
+	//vec.chain().push_back(0);
+	//vec.chain().push_back(3);
+	//vec.chain().push_back(8);
+	//vec.chain().push_back(3);
+	//vec.chain().push_back(5);
+	//vec.chain().push_back(10);
 
-	for (char c : vec.chain()) { std::cout << c; }
-*/
+	// for (char c : vec.chain()) { std::cout << c << ", "; }
+
 }
 
 
