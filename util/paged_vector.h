@@ -178,6 +178,8 @@ namespace util {
 		constexpr difference_type operator-(const paged_vector_iterator& other) const;
 
 		constexpr size_t get_index() const;
+		constexpr std::pair<uint16_t, uint16_t> get_indices() const;
+	
 	private:
 		base_range* range;
 		uint16_t page_index;

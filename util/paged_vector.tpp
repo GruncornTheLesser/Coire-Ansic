@@ -12,7 +12,7 @@ constexpr util::paged_vector<T, Page_Alloc_T>::paged_vector(size_t n, const allo
 {
 	reserve(extent);
 
-	for (int page_i = 0; page_i < page_count() - 1; ++page_i)
+	for (int page_i = 0; page_i < extent / page_size; ++page_i)
 		std::uninitialized_default_construct_n(pages[page_i].data(), page_size);
 	std::uninitialized_default_construct_n(pages.back().data(), extent % page_size);
 }
@@ -23,7 +23,7 @@ constexpr util::paged_vector<T, Page_Alloc_T>::paged_vector(size_t n, const T& v
 {
 	reserve(extent);
 
-	for (int page_i = 0; page_i < page_count() - 1; ++page_i)
+	for (int page_i = 0; page_i < extent / page_size; ++page_i)
 		std::uninitialized_fill_n(pages[page_i].data(), page_size, value);
 	std::uninitialized_fill_n(pages.back().data(), extent % page_size, value);
 }
@@ -34,7 +34,7 @@ constexpr util::paged_vector<T, Page_Alloc_T>::paged_vector(It first, It last, c
 {
 	reserve(extent);
 
-	for (int page_i = 0; page_i < page_count() - 1; ++page_i, first += page_size)
+	for (int page_i = 0; page_i < extent / page_size; ++page_i, first += page_size)
 		std::uninitialized_copy_n(first, page_size, pages[page_i].data());
 	std::uninitialized_copy_n(first, extent % page_size, pages.back().data());
 }
@@ -45,7 +45,7 @@ constexpr util::paged_vector<T, Page_Alloc_T>::paged_vector(const paged_vector& 
 {
 	reserve(extent);
 
-	for (int page_i = 0; page_i < page_count() - 1; ++page_i)
+	for (int page_i = 0; page_i < extent / page_size; ++page_i)
 		std::uninitialized_copy_n(other.pages[page_i].data(), page_size, pages[page_i].data());
 	std::uninitialized_copy_n(other.pages.back().data(), extent % page_size, pages.back().data());
 
@@ -115,6 +115,8 @@ template<std::input_iterator It>
 void util::paged_vector<T, Page_Alloc_T>::assign(It first, It last)
 {
 	size_t count = last - first;
+	if (count == 0) return;
+
 	reserve(count);
 
 	size_t page_n = extent / page_size;
@@ -173,6 +175,8 @@ void util::paged_vector<T, Page_Alloc_T>::assign(It first, It last)
 template<typename T, typename Page_Alloc_T>
 void util::paged_vector<T, Page_Alloc_T>::assign(size_t count, const T& value)
 {
+	if (count == 0) return;
+
 	reserve(count);
 
 	size_t page_n = extent / page_size;
@@ -362,8 +366,6 @@ constexpr size_t util::paged_vector<T, Page_Alloc_T>::capacity() const
 template<typename T, typename Page_Alloc_T>
 constexpr void util::paged_vector<T, Page_Alloc_T>::resize(size_t n)
 {
-	reserve(n);
-
 	size_t page_n = extent / page_size;
 	size_t elem_n = extent % page_size;
 	size_t new_page_n = n / page_size;
@@ -371,6 +373,8 @@ constexpr void util::paged_vector<T, Page_Alloc_T>::resize(size_t n)
 
 	if (extent < n)
 	{
+		reserve(n);
+
 		if (page_n == new_page_n)
 		{
 			std::uninitialized_default_construct_n(pages[page_n].data() + elem_n, new_elem_n - elem_n);
@@ -404,8 +408,6 @@ constexpr void util::paged_vector<T, Page_Alloc_T>::resize(size_t n)
 template<typename T, typename Page_Alloc_T>
 constexpr void util::paged_vector<T, Page_Alloc_T>::resize(size_t n, const T& value)
 {
-	reserve(n);
-
 	size_t page_n = extent / page_size;
 	size_t elem_n = extent % page_size;
 	size_t new_page_n = n / page_size;
@@ -413,6 +415,8 @@ constexpr void util::paged_vector<T, Page_Alloc_T>::resize(size_t n, const T& va
 
 	if (extent < n)
 	{
+		reserve(n);
+	
 		if (page_n == new_page_n)
 		{
 			std::uninitialized_fill_n(pages[page_n].data() + elem_n, new_elem_n - elem_n, value);
@@ -446,7 +450,10 @@ constexpr void util::paged_vector<T, Page_Alloc_T>::resize(size_t n, const T& va
 template<typename T, typename Page_Alloc_T>
 constexpr void util::paged_vector<T, Page_Alloc_T>::reserve(size_t n)
 {
-	size_t count = (n / page_size) + 1;
+	if (n == 0) return;
+	
+	size_t count = ((n - 1) / page_size) + 1;
+	
 	if (count > page_count())
 	{
 		// allocate pages
@@ -461,7 +468,7 @@ constexpr void util::paged_vector<T, Page_Alloc_T>::shrink_to_fit()
 {
 	size_t page_end = (extent / page_size);
 	// deallocate pages
-	for (int page_i = page_count() - 1; page_i != page_end; --page_i)
+	for (int page_i = extent / page_size; page_i != page_end; --page_i)
 	{
 		get_allocator().deallocate(pages[page_i].data(), page_size);
 		pages.pop_back();
@@ -632,11 +639,11 @@ template<typename T, typename Page_Alloc_T> template<std::input_iterator It>
 constexpr util::paged_vector<T, Page_Alloc_T>::iterator
 util::paged_vector<T, Page_Alloc_T>::insert(const_iterator pos, It first, It last)
 {
-	iterator it = begin() + (pos - cbegin());
 	size_t n = last - first;
+	iterator it = begin() + (pos - cbegin());
 	reserve(extent + n);
 	std::move_backward(pos, cend(), end() + n);
-	std::uninitialized_move(first, last, it);
+	std::uninitialized_copy(first, last, it);
 	extent += n;
 	return it;
 }
@@ -911,4 +918,11 @@ template<typename T, typename Page_Alloc_T>
 constexpr size_t util::paged_vector_iterator<T, Page_Alloc_T>::get_index() const
 {
 	return (page_index * page_size) + elem_index;
+}
+
+
+template<typename T, typename Page_Alloc_T>
+constexpr std::pair<uint16_t, uint16_t> util::paged_vector_iterator<T, Page_Alloc_T>::get_indices() const
+{
+	return { page_index, elem_index };
 }

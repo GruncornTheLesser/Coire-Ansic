@@ -10,8 +10,8 @@
 				// "--sys-root=", // use as root dir for headers and libraries
 				// "-I /path/" // add to compiler's search path written from root of the filesystem
 				"-Werror",
-				"-ftemplate-depth=100", 
-				"-fdiagnostics-color=always", 
+				"-ftemplate-depth=100",
+				"-fdiagnostics-color=always",
 				"-fdiagnostics-show-location=once" ],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -23,6 +23,9 @@
 				"kind": "build",
 				"isDefault": true
 			},
+			"presentation": {
+                "clear": true
+            }
 		}
 	],
 	"version": "2.0.0"

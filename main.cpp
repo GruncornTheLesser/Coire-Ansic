@@ -59,7 +59,7 @@ int main()
 */
 
 #include "util/paged_vector.h"
-//#include "util/chain_vector.h"
+#include "util/chain_vector.h"
 //#include "util/compressed.h"
 #include <iostream>
 #include <ranges>
@@ -122,19 +122,30 @@ int main() {
 		vec_a.shrink_to_fit();
 	}
 	
-	/*
+	
 	using chain_vec = util::chain_vector<int, std::allocator<int>, 4u>;
-	chain_vec vec = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l' };
-	auto chain_view = vec.view();
-	chain_view.insert(vec.begin() + 0);
-	chain_view.insert(vec.begin() + 3);
-	chain_view.insert(vec.begin() + 8);
-	chain_view.insert(vec.begin() + 3);
-	chain_view.insert(vec.begin() + 5);
-	// vec.view().insert(vec.begin() + 10, vec.begin() + 12);
+	{
+		chain_vec vec
+		{ 
+			'a', 'b', 'c', 'd', 
+			'e', 'f', 'g', 'h', 
+			'i', 'j', 'k', 'l' 
+		};
 
-	for (char c : vec.view()) { std::cout << c << ", "; }
-	*/
+		auto chain_view = vec.view();
+		vec.view().insert(vec.begin() + 0); // a
+		vec.view().insert(vec.begin() + 8); // i
+		vec.view().insert(vec.begin() + 3); // d
+		vec.view().insert(vec.begin() + 3); // d
+		vec.view().insert(vec.begin() + 5); // f
+		vec.view().insert(vec.begin() + 10); // k
+		auto beg = chain_view.begin();
+		auto end = chain_view.end();
+		for (char c : vec.view()) { std::cout << c << ", "; }
+		
+		vec.view().clear_page(vec.get_page(1));
+
+	}
 }
 
 
