@@ -7,19 +7,21 @@
 // builders - select, from, where, view
 // view_indexable, view_iterable
 
+// TODO: specialize resources per handle as well as component
+// * this would allow different handles to use the same component types
 
 // forward declare default types
 namespace ecs
 {
+	struct entity;
+	template<typename T> struct handle_generator;
+	template<typename T> struct handle_manager;
 	template<typename T> struct basic_manager;
 	template<typename T> struct basic_indexer;
 	template<typename T> struct basic_storage;
-
-	struct entity;
-	template<typename T> struct handle_manager;
 }
 
-namespace ecs::tags 
+namespace ecs::tags
 {
 	struct resource;
 	template<typename T>      struct handletype;
@@ -28,28 +30,49 @@ namespace ecs::tags
 	template<typename ... Ts> struct uniontype;
 }
 
-namespace ecs::traits 
+namespace ecs::signals
+{
+	template<typename T> struct updated;	// component created, destroyed or moved
+	template<typename T> struct created;	// entity or component created
+	template<typename T> struct destroyed;	// entity or component destroyed
+	template<typename T> struct acquire;	// entity or component created
+	template<typename T> struct release;	// entity or component destroyed
+}
+
+namespace ecs::traits
 {
 	DECL_ATTRIB_NAMESPACE
-
+	// tag 
 	DECL_TYPE_ATTRIB(component_tag, tags::basictype<T>)
 
+	// tag attributes
 	DECL_TEMPLATE_ATTRIB(handle_alias,  entity)
 	DECL_TEMPLATE_ATTRIB(manager_alias, basic_manager<T>)
 	DECL_TEMPLATE_ATTRIB(indexer_alias, basic_indexer<T>)
 	DECL_TEMPLATE_ATTRIB(storage_alias, basic_storage<T>)
-	
+
+	// component attributes
 	DECL_TYPE_ATTRIB(component_handle,  EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::handle_alias<T>>))
 	DECL_TYPE_ATTRIB(component_manager, EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::manager_alias<T>>))
 	DECL_TYPE_ATTRIB(component_indexer, EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::indexer_alias<T>>))
 	DECL_TYPE_ATTRIB(component_storage, EXPAND(get_template_attribute_t<get_attribute_t<T, attribute::component_tag>, attribute::storage_alias<T>>))
 }
 
-namespace ecs::traits {
+namespace ecs {
+	template<typename T>
+	struct resource_wrapper
+	{
+		using component_tag = tags::resource;
+		using resource_type = T;
+	};
+}
+// getter traits
+namespace ecs::traits
+{
 	template<typename T, typename=std::void_t<>> struct get_tag : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_tag>, T> { };
 	template<typename T> struct get_tag<T, std::enable_if_t<std::is_same_v<get_attribute_t<T, attribute::component_tag>, tags::resource>>> : std::type_identity<T> { };
 	template<typename T> using get_tag_t = typename get_tag<T>::type;
-
+	
 	template<typename T> struct get_handle : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_handle>, T> { };
 	template<typename T> using get_handle_t = typename get_handle<T>::type;
 
@@ -64,9 +87,14 @@ namespace ecs::traits {
 
 }
 
-namespace ecs::traits 
+// concept traits
+namespace ecs::traits
 {
 	// TODO: finish me
+	template<typename T> struct is_entity : std::negation<std::is_void<T>> { };
+	template<typename T> static constexpr bool is_entity_v = is_entity<T>::value;
+	template<typename T> concept entity_class = is_entity<T>::value;
+
 	template<typename T> struct is_component : std::negation<std::is_void<T>> { };
 	template<typename T> static constexpr bool is_component_v = is_component<T>::value;
 	template<typename T> concept component_class = is_component<T>::value;
@@ -79,49 +107,51 @@ namespace ecs::traits
 	template<typename T> static constexpr bool is_execution_policy_v = is_execution_policy<T>::value;
 	template<typename T> concept execution_policy_class = is_execution_policy<T>::value;
 
-	template<typename T> struct is_handle : std::negation<std::is_void<T>> { };
-	template<typename T> static constexpr bool is_handle_v = is_handle<T>::value;
-	template<typename T> concept handle_class = is_handle<T>::value;
-
 	template<typename T> struct is_manager : std::negation<std::is_void<T>> { };
 	template<typename T> static constexpr bool is_manager_v = is_manager<T>::value;
-	
+
 	template<typename T> struct is_indexer : std::negation<std::is_void<T>> { };
 	template<typename T> static constexpr bool is_indexer_v = is_indexer<T>::value;
-	
+
 	template<typename T> struct is_storage : std::negation<std::is_void<T>> { };
 	template<typename T> static constexpr bool is_storage_v = is_storage<T>::value;
 }
 
-namespace ecs 
+// exposed aliases
+namespace ecs
 {
+	/// @brief a handle is a unique ID to reference an entity and it's components.
+	/// a component's handle declares what entity class the component belongs to.
 	template<typename T> using handle = typename traits::get_handle<T>::type;
+	/// @brief a component's manager is the container for the handles to reorder entities
 	template<typename T> using manager = typename traits::get_manager<T>::type;
+	/// @brief a component's indexer is the look up for the index of the components from the handle
 	template<typename T> using indexer = typename traits::get_indexer<T>::type;
+	/// @brief a component's storage stores the components
 	template<typename T> using storage = typename traits::get_storage<T>::type;
 }
 
-
 #include "tags.h"
 
+#ifdef _DEBUG
 namespace ecs::test
 {
 	namespace {
 		template<typename T>
-		struct entity_alternative { 
+		struct entity_alternative {
 			using component_tag = tags::handletype<T>;
 		};
 		template<typename T>
-		struct test_tag { 
+		struct test_tag {
 			template<typename U> using handle_alias = entity_alternative<T>;
 			template<typename U> using manager_alias = ecs::basic_manager<T>;
 			template<typename U> using indexer_alias = ecs::basic_indexer<T>;
 			template<typename U> using storage_alias = ecs::basic_storage<T>;
 		};
-		
+
 
 		struct A { };
-		struct B { 
+		struct B {
 			using component_tag = test_tag<A>;
 		};
 		struct C {
@@ -143,7 +173,7 @@ namespace ecs::test
 		static_assert(std::is_same_v<ecs::traits::get_indexer_t<A>, ecs::basic_indexer<A>>, "failed default indexer");
 		static_assert(std::is_same_v<ecs::traits::get_storage_t<A>, ecs::basic_storage<A>>, "failed default storage");
 
-		static_assert(std::is_same_v<ecs::traits::get_handle_t<B>, entity_alternative<A>>, "failed tag handle");
+		static_assert(std::is_same_v<ecs::traits::get_handle_t<B>, entity_alternative<A>>,  "failed tag handle");
 		static_assert(std::is_same_v<ecs::traits::get_manager_t<B>, ecs::basic_manager<A>>, "failed tag manager");
 		static_assert(std::is_same_v<ecs::traits::get_indexer_t<B>, ecs::basic_indexer<A>>, "failed tag indexer");
 		static_assert(std::is_same_v<ecs::traits::get_storage_t<B>, ecs::basic_storage<A>>, "failed tag storage");
@@ -159,8 +189,7 @@ namespace ecs::test
 		static_assert(std::is_same_v<ecs::traits::get_storage_t<D>, ecs::basic_storage<A>>, "failed tag override storage");
 	}
 }
-
-
+#endif // DEBUG
 
 
 

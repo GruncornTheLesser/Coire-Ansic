@@ -8,20 +8,20 @@
 #include "handle.h"
 #include "view_arguments.h"
 
-namespace ecs 
+namespace ecs
 {
-	template<typename Select_T, 
-		typename From_T = typename traits::view_from_builder<Select_T>::type, 
+	template<typename Select_T,
+		typename From_T = typename traits::view_from_builder<Select_T>::type,
 		typename where_T = typename traits::view_where_builder<Select_T, From_T>::type,
 		typename Pip_T = typename traits::view_pipeline_builder<Select_T, From_T, where_T>::type>
 	class view;
 
 	template<typename Select_T, typename From_T, typename Pip_T>
 	class view_reference;
-	
+
 	template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
 	class view_iterator;
-	
+
 	template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
 	class view
 	{
@@ -40,7 +40,7 @@ namespace ecs
 
 		const_reverse_iterator begin() const;
 		const_reverse_iterator end() const;
-		
+
 		iterator rbegin();
 		iterator rend();
 
@@ -51,10 +51,10 @@ namespace ecs
 	};
 
 	template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-	class view_iterator 
+	class view_iterator
 	{
 	public:
-		
+
 		using iterator_category = std::random_access_iterator_tag;
 		using value_type = view_reference<Select_T, From_T, Pip_T>;
 		using reference = view_reference<Select_T, From_T, Pip_T>;
@@ -69,9 +69,9 @@ namespace ecs
 		view_iterator operator++(int);
 		view_iterator& operator--();
 		view_iterator operator--(int);
-		
+
 		ptrdiff_t operator-(const view_iterator& other);
-		
+
 		bool operator==(const view_iterator& other);
 		bool operator!=(const view_iterator& other);
 		bool operator<(const view_iterator& other);
@@ -88,21 +88,21 @@ namespace ecs
 	};
 
 	template<typename Select_T, typename From_T, typename Pip_T>
-	class view_reference 
+	class view_reference
 	{
 	public:
 		view_reference(Pip_T& pip, size_t index);
-		
-		template<typename U> 
+
+		template<typename U>
 		operator U()
-		{ 
+		{
 			return get<0>();
 		}
 
-		template<size_t N> 
+		template<size_t N>
 		std::tuple_element_t<N, view_reference> get();
-		
-		template<size_t N> 
+
+		template<size_t N>
 		std::tuple_element_t<N, const view_reference> get() const;
 	private:
 		ecs::entity ent;
@@ -118,59 +118,59 @@ ecs::view<Select_T, From_T, where_T, Pip_T>::view(Pip_T&& base) : pip(std::forwa
 { }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::reverse_iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::reverse_iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::begin()
 {
 	return std::reverse_iterator { rend() };
 }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::reverse_iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::reverse_iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::end()
 {
 	return std::reverse_iterator { rbegin() };
 }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::const_reverse_iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::const_reverse_iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::begin() const {
 	return ++std::reverse_iterator { rend() };
 }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::const_reverse_iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::const_reverse_iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::end() const {
 	return std::reverse_iterator { rbegin() };
 }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::rbegin()
 {
 	return ++iterator { pip, -1 };
 }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::const_iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::const_iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::rbegin() const {
 	return ++const_iterator { pip, -1 };
 }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::rend()
 {
 	return iterator{ pip, static_cast<int>(pip.template get_resource<typename From_T::type>().size()) };
 }
 
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
-ecs::view<Select_T, From_T, where_T, Pip_T>::const_iterator 
+ecs::view<Select_T, From_T, where_T, Pip_T>::const_iterator
 ecs::view<Select_T, From_T, where_T, Pip_T>::rend() const {
 	return const_iterator{ pip, static_cast<int>(pip.template get_resource<typename From_T::type>().size()) };
 }
 #pragma endregion
 
-#pragma region view iterator 
+#pragma region view iterator
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
 ecs::view_iterator<Select_T, From_T, where_T, Pip_T>::view_iterator(Pip_T& pip, int index) : pip(pip), ind(index)
 { }
@@ -210,7 +210,7 @@ ecs::view_iterator<Select_T, From_T, where_T, Pip_T>::operator--()
 template<typename Select_T, typename From_T, typename where_T, typename Pip_T>
 ecs::view_iterator<Select_T, From_T, where_T, Pip_T>
 ecs::view_iterator<Select_T, From_T, where_T, Pip_T>::operator--(int)
-{ 
+{
 	auto temp = *this;
 	--(*this);
 	return temp;
@@ -259,7 +259,7 @@ bool ecs::view_iterator<Select_T, From_T, where_T, Pip_T>::operator>=(const view
 }
 
 template<typename Select_T, typename From_T, typename Where_T, typename Pip_T>
-bool ecs::view_iterator<Select_T, From_T, Where_T, Pip_T>::valid() 
+bool ecs::view_iterator<Select_T, From_T, Where_T, Pip_T>::valid()
 {
 	// !where_T::check(pip, ent = pip.template get_resource<typename From_T::type>()[ind])
 	return true;
@@ -267,14 +267,14 @@ bool ecs::view_iterator<Select_T, From_T, Where_T, Pip_T>::valid()
 
 #pragma endregion
 
-#pragma region view reference 
+#pragma region view reference
 
 template<typename Select_T, typename From_T, typename Pip_T>
 ecs::view_reference<Select_T, From_T, Pip_T>::view_reference(Pip_T& pip, size_t i) : pip(pip), ind(i)
 {
 	if constexpr (util::anyof_v<Select_T, util::pred::disjunction_<
 			util::compare_to_<ecs::entity, util::cmp::is_ignore_const_same>::template type,
-			util::compare_to_<typename From_T::type, std::is_same, util::wrap_<ecs::manager>::template type>::template type 
+			util::compare_to_<typename From_T::type, std::is_same, util::wrap_<ecs::manager>::template type>::template type
 		>::template type>)
 	{
 		ent = pip.template get_resource<typename From_T::type>()[ind];
@@ -282,8 +282,8 @@ ecs::view_reference<Select_T, From_T, Pip_T>::view_reference(Pip_T& pip, size_t 
 }
 
 template<typename Select_T, typename From_T, typename Pip_T>
-template<size_t N> 
-std::tuple_element_t<N, ecs::view_reference<Select_T, From_T, Pip_T>> 
+template<size_t N>
+std::tuple_element_t<N, ecs::view_reference<Select_T, From_T, Pip_T>>
 ecs::view_reference<Select_T, From_T, Pip_T>::get()
 {
 	using T = std::remove_reference_t<std::tuple_element_t<N, view_reference>>;
@@ -305,13 +305,13 @@ ecs::view_reference<Select_T, From_T, Pip_T>::get()
 }
 
 template<typename Select_T, typename From_T, typename Pip_T>
-template<size_t N> 
-std::tuple_element_t<N, const ecs::view_reference<Select_T, From_T, Pip_T>> 
+template<size_t N>
+std::tuple_element_t<N, const ecs::view_reference<Select_T, From_T, Pip_T>>
 ecs::view_reference<Select_T, From_T, Pip_T>::get() const {
 	using T = std::remove_reference_t<std::tuple_element_t<N, view_reference>>;
 	using indexer_t = const ecs::indexer<std::remove_const_t<T>>;
 	using storage_t = util::propagate_const_wrap_t<T, storage>;
-	
+
 	if constexpr (std::is_same_v<ecs::entity, std::remove_const_t<T>>)
 		return ent;
 	else
@@ -326,7 +326,7 @@ ecs::view_reference<Select_T, From_T, Pip_T>::get() const {
 	}
 }
 
-// view reference structured binding 
+// view reference structured binding
 template<typename Select_T, typename From_T, typename Pip_T>
 struct std::tuple_size<ecs::view_reference<Select_T, From_T, Pip_T>>
 	 : std::tuple_size<typename Select_T::retrieve_set> { };

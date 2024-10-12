@@ -2,62 +2,69 @@
 #include <cstdint>
 #include <vector>
 #include <bitset>
+#include <concepts>
+#include "../util/chain_vector.h"
 #include "traits.h"
 namespace ecs {
-	template<typename T> class handle_manager;
-	
-	struct entity final 
+	template<typename T>
+	class handle_generator;
+
+	template<std::unsigned_integral T=uint32_t>
+	struct entity
 	{
-		template<typename T> friend class handle_manager;
+		friend class handle_generator;
 		using component_tag = tags::handletype<entity>;
 
 	private:
-	 	entity(uint32_t v) : value(v) { }
+	 	entity(T value, T version) : value(value), version(version) { }
 	public:
-		entity() : value(static_cast<uint32_t>(-1)) { }
+		entity() : version(0) { }
 		operator uint32_t() { return value; }
-
+		bool operator==(const entity& other) const { return value == other.value && version == other.version; }
 	private:
-		uint32_t value; 
+		T value;
+		T version;
 	};
 	const entity tombstone{};
 
-	template<typename handle_T>
-	class handle_manager
+
+	template<typename T>
+	class handle_generator
 	{
 	public:
 		using component_tag = tags::resource;
-		using value_type = handle_T;
 
-		handle_T create() 
-		{ 
-			uint32_t e;
-			if (inactive.size() > 0)
-			{
-				e = inactive.back();
-				inactive.pop_back();
-			}
-			else 
-			{
-				if (next == active.size() >> 32) active.emplace_back();
-				e = next++;
-			}
-		
-			active[e / 32].set(e % 32);
-			return handle_T{ e };
-		}
-		void destroy(handle_T e)
+		[[nodiscard]] entity create()
 		{
-			active[e / 32].set(e % 32, false);
-			inactive.push_back(e);
+			uint32_t value;
+			uint32_t version;
+
+			if (entities.chain().empty())
+			{
+				value = entities.size();
+				version = 1;
+				entities.emplace_back(version);
+			}
+			else
+			{
+				value = (entities.chain().begin() - entities.begin());
+				version = entities.chain().front();
+				entities.chain().pop_front();
+			}
+
+			return { value, version };
 		}
-		bool alive(handle_T e) 
+		void destroy(entity e)
 		{
-			return active[(uint32_t)e / 32].test(e % 32);
+			auto it = entities.begin() + e.value;
+			++(*it);
+			entities.chain().insert(it);
+		}
+		bool alive(entity e) const
+		{
+			return e.version == entities[e.value];
 		}
 	private:
-		std::vector<std::bitset<4096>> active;
-		std::vector<handle_T> inactive;
-		uint32_t next = 0;
+		util::chain_vector<uint32_t> entities;
 	};
 }

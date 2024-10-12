@@ -25,7 +25,7 @@ namespace util {
 	{ }
 
 	template<typename T>
-	T& erased_unique_ptr::get() { 
+	T& erased_unique_ptr::get() {
 		return *reinterpret_cast<T*>(ptr.get());
 	}
 
@@ -42,11 +42,11 @@ namespace util {
 
 	template<typename T>
 	erased_shared_ptr::erased_shared_ptr(T* ptr)
-		: ptr(ptr, util::default_delete<T>{}) 
+		: ptr(ptr, util::default_delete<T>{})
 	{ }
 
 	template<typename T>
-	T& erased_shared_ptr::get() { 
+	T& erased_shared_ptr::get() {
 		return *reinterpret_cast<T*>(ptr.get());
 	}
 }

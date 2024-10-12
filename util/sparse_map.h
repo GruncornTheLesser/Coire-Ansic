@@ -23,7 +23,7 @@ Capacity: // NOTE: currently it doesnt count capacity
 empty - checks whether the container is empty
 max_size - returns the maximum possible number of elements
 
-Modifiers: // NOTE: a lot of these are unsuitable too, 
+Modifiers: // NOTE: a lot of these are unsuitable too,
 clear - clears the contents
 insert - inserts elements or nodes
 insert_range - inserts a range of elements
@@ -52,30 +52,30 @@ value_comp - returns the function that compares keys in objects of type value_ty
 
 */
 namespace util {
-	template<typename key_t, typename val_t, val_t tombstone=val_t{}> 
-	class sparse_map 
+	template<typename key_t, typename val_t, val_t tombstone=val_t{}>
+	class sparse_map
 	{
 	public:
 		static constexpr size_t page_size = 4096;
 
 		sparse_map(size_t new_page_count = 8);
 		~sparse_map();
-		
+
 		sparse_map(sparse_map<key_t, val_t, tombstone>& other);
 		sparse_map<key_t, val_t, tombstone>& operator=(sparse_map<key_t, val_t, tombstone>& other);
 		sparse_map(sparse_map<key_t, val_t, tombstone>&& other);
 		sparse_map<key_t, val_t, tombstone>& operator=(sparse_map<key_t, val_t, tombstone>&& other);
-		
+
 		val_t& operator[](key_t key);
 		const val_t& operator[](key_t key) const;
-		
+
 		val_t& at(key_t key);
 		const val_t& at(key_t key) const;
 
 		void reserve(key_t key);
 
 		size_t capacity() const;
-		
+
 		bool contains(size_t key) const;
 
 	private:
@@ -94,17 +94,17 @@ util::sparse_map<key_t, val_t, tombstone>::sparse_map(size_t new_page_count) : p
 
 
 template<typename key_t, typename val_t, val_t tombstone>
-util::sparse_map<key_t, val_t, tombstone>::~sparse_map() 
+util::sparse_map<key_t, val_t, tombstone>::~sparse_map()
 {
 	if (pages != nullptr)
 	{
-		std::for_each(pages, pages + page_capacity, [](val_t* page) { 
-			if (page != nullptr) std::allocator<val_t>().deallocate(page, page_size); 
+		std::for_each(pages, pages + page_capacity, [](val_t* page) {
+			if (page != nullptr) std::allocator<val_t>().deallocate(page, page_size);
 		});
 		std::allocator<val_t*>().deallocate(pages, page_size);
 	}
 }
-		
+
 
 ////template<typename K, typename V, V T>
 ////util::sparse_map<K, V, T>::sparse_map(sparse_map<K, V, T>& other);
@@ -113,7 +113,7 @@ util::sparse_map<key_t, val_t, tombstone>::~sparse_map()
 ////util::sparse_map<K, V, T>& util::sparse_map<K, V, T>::operator=(sparse_map<K, V, T>& other);
 
 template<typename key_t, typename val_t, val_t tombstone>
-util::sparse_map<key_t, val_t, tombstone>::sparse_map(sparse_map&& other) 
+util::sparse_map<key_t, val_t, tombstone>::sparse_map(sparse_map&& other)
 {
 	pages = other.pages;
 	page_capacity = other.page_capacity;
@@ -122,8 +122,8 @@ util::sparse_map<key_t, val_t, tombstone>::sparse_map(sparse_map&& other)
 }
 
 template<typename key_t, typename val_t, val_t tombstone>
-util::sparse_map<key_t, val_t, tombstone>& util::sparse_map<key_t, val_t, tombstone>::operator=(sparse_map<key_t, val_t, tombstone>&& other) 
-{ 
+util::sparse_map<key_t, val_t, tombstone>& util::sparse_map<key_t, val_t, tombstone>::operator=(sparse_map<key_t, val_t, tombstone>&& other)
+{
 	std::swap(pages, other.pages);
 	std::swap(page_capacity, other.page_capacity);
 }
@@ -132,7 +132,7 @@ util::sparse_map<key_t, val_t, tombstone>& util::sparse_map<key_t, val_t, tombst
 
 
 template<typename key_t, typename val_t, val_t tombstone>
-val_t& util::sparse_map<key_t, val_t, tombstone>::operator[](key_t key) 
+val_t& util::sparse_map<key_t, val_t, tombstone>::operator[](key_t key)
 {
 	size_t page_index = key / page_size;
 	size_t elem_index = key % page_size;
@@ -144,61 +144,61 @@ template<typename key_t, typename val_t, val_t tombstone>
 const val_t& util::sparse_map<key_t, val_t, tombstone>::operator[](key_t key) const {
 	size_t page_index = key / page_size;
 	size_t elem_index = key % page_size;
-	
-	//if (page_index > page_capacity || pages[page_index] == nullptr) 
+
+	//if (page_index > page_capacity || pages[page_index] == nullptr)
 	//	throw std::out_of_range("");
-	
+
 	return pages[page_index][elem_index];
 }
-		
+
 template<typename key_t, typename val_t, val_t tombstone>
-val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key) 
+val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key)
 {
 	size_t page_index = key / page_size;
 	size_t elem_index = key % page_size;
-	if (page_index > page_capacity || pages[page_index] == nullptr) 
+	if (page_index > page_capacity || pages[page_index] == nullptr)
 		throw std::out_of_range("");
 	return pages[page_index][elem_index];
 }
 
 template<typename key_t, typename val_t, val_t tombstone>
-const val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key) const 
+const val_t& util::sparse_map<key_t, val_t, tombstone>::at(key_t key) const
 {
 	size_t page_index = key / page_size;
 	size_t elem_index = key % page_size;
-	// ? error handling?? -> 
-	//if (page_index > page_capacity || pages[page_index] == nullptr) 
+	// ? error handling?? ->
+	//if (page_index > page_capacity || pages[page_index] == nullptr)
 	// 		throw error???
 	return pages[page_index][elem_index];
 }
 
 template<typename key_t, typename val_t, val_t tombstone>
-void util::sparse_map<key_t, val_t, tombstone>::reserve(key_t key) 
+void util::sparse_map<key_t, val_t, tombstone>::reserve(key_t key)
 {
 	assure_page(key / page_size);
 }
 
 template<typename key_t, typename val_t, val_t tombstone>
-size_t util::sparse_map<key_t, val_t, tombstone>::capacity() const { 
+size_t util::sparse_map<key_t, val_t, tombstone>::capacity() const {
 	return page_capacity * page_size;
 }
 
-template<typename key_t, typename val_t, val_t tombstone>	
-bool util::sparse_map<key_t, val_t, tombstone>::contains(size_t key) const 
+template<typename key_t, typename val_t, val_t tombstone>
+bool util::sparse_map<key_t, val_t, tombstone>::contains(size_t key) const
 {
 	size_t page_index = key / page_size;
 	size_t elem_index = key % page_size;
 	return page_index <= page_capacity && pages[page_index] != nullptr && pages[page_index][elem_index] != tombstone;
 }
 
-template<typename key_t, typename val_t, val_t tombstone>		
+template<typename key_t, typename val_t, val_t tombstone>
 val_t* util::sparse_map<key_t, val_t, tombstone>::assure_page(size_t page_index)
 {
-	if (page_index >= page_capacity) 
-	{	
+	if (page_index >= page_capacity)
+	{
 		size_t new_page_count = page_index + 1;
 		val_t** new_pages = std::allocator<val_t*>().allocate(new_page_count);
-		
+
 		std::copy(pages, pages + page_capacity, new_pages);
 		std::fill(new_pages + page_capacity, new_pages + new_page_count, nullptr);
 
@@ -211,10 +211,10 @@ val_t* util::sparse_map<key_t, val_t, tombstone>::assure_page(size_t page_index)
 	val_t* page = pages[page_index];
 
 	if (page != nullptr) return page;
-	
+
 	page = std::allocator<val_t>().allocate(page_size);
 	std::fill(page, page + page_size, tombstone);
 	pages[page_index] = page;
-	
+
 	return page;
 }
