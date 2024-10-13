@@ -91,19 +91,19 @@ namespace ecs::traits
 // getter traits
 namespace ecs::traits
 {
-	template<typename T> struct get_entity : util::copy_cv<get_attribute_t<T, attribute::component_handle>, T> { };
+	template<typename T> struct get_entity : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_handle>, T> { };
 	template<typename T> using get_entity_t = typename get_entity<T>::type;
 
-	template<typename T> struct get_events : get_attribute<T, attribute::component_events> { };
+	template<typename T> struct get_events : get_attribute<std::remove_cv_t<T>, attribute::component_events> { };
 	template<typename T> using get_events_t = typename get_events<T>::type;
 	
-	template<typename T> struct get_manager : util::copy_cv<get_attribute_t<T, attribute::component_manager>, T> { };
+	template<typename T> struct get_manager : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_manager>, T> { };
 	template<typename T> using get_manager_t = typename get_manager<T>::type;
 
-	template<typename T> struct get_indexer : util::copy_cv<get_attribute_t<T, attribute::component_indexer>, T> { };
+	template<typename T> struct get_indexer : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_indexer>, T> { };
 	template<typename T> using get_indexer_t = typename get_indexer<T>::type;
 
-	template<typename T> struct get_storage : util::copy_cv<get_attribute_t<T, attribute::component_storage>, T> { };
+	template<typename T> struct get_storage : util::copy_cv<get_attribute_t<std::remove_cv_t<T>, attribute::component_storage>, T> { };
 	template<typename T> using get_storage_t = typename get_storage<T>::type;
 
 	template<typename ... Ts>
