@@ -10,7 +10,7 @@
 // view_indexable, view_iterable
 
 #ifndef DEFAULT_HANDLE
-#define DEFAULT_HANDLE handle<>
+#define DEFAULT_HANDLE handle
 #endif
 
 #ifndef DEFAULT_MANAGER
@@ -35,7 +35,7 @@
 
 namespace ecs
 {
-	template<std::unsigned_integral T=uint32_t, std::unsigned_integral V=uint32_t> 
+	//template<std::unsigned_integral T=uint32_t, std::unsigned_integral V=uint32_t> 
 	struct handle;
 
 	template<typename T, typename Alloc_T=std::allocator<T>> class entity_manager;
@@ -108,7 +108,7 @@ namespace ecs::traits
 
 	template<typename ... Ts>
 	using event_set_dispatcher = util::eval_t<std::tuple<Ts...>, 
-		util::eval_each_<util::eval_branch_<
+		util::eval_each_<util::eval_split_<
 			get_events,
 			util::eval_<get_entity, get_events>::template type
 			>::template type,
@@ -198,7 +198,7 @@ namespace ecs::test
 			using component_storage = ecs::component_storage<A>;
 		};
 
-		static_assert(std::is_same_v<ecs::traits::get_entity_t<A>, ecs::handle<>>, "failed default entity");
+		static_assert(std::is_same_v<ecs::traits::get_entity_t<A>, DEFAULT_HANDLE>, "failed default entity");
 		static_assert(std::is_same_v<ecs::traits::get_manager_t<A>, ecs::component_manager<A>>, "failed default manager");
 		static_assert(std::is_same_v<ecs::traits::get_indexer_t<A>, ecs::component_indexer<A>>, "failed default indexer");
 		static_assert(std::is_same_v<ecs::traits::get_storage_t<A>, ecs::component_storage<A>>, "failed default storage");

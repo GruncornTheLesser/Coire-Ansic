@@ -7,13 +7,16 @@
 namespace ecs {	
 	struct tombstone { };
 
-	template<std::unsigned_integral T, std::unsigned_integral V>
+	//template<std::unsigned_integral T, std::unsigned_integral V>
 	struct handle
-	{
-		using component_tag = ecs::tags::handletype<handle<T, V>>;
+	{	
+		using T = uint32_t;
+		using V = uint32_t;
+
+		using component_tag = ecs::tags::handletype<handle>;
 
 		template<typename,typename> friend class entity_manager;
-		template<typename...> friend class static_registry;
+		template<typename, typename> friend class pool;
 		
 		using value_type = T;
 		using version_type = V;
@@ -54,7 +57,6 @@ namespace ecs {
 		version_type version() const {
 			return ver;
 		}
-	
 	private:
 		value_type val;
 		version_type ver;

@@ -6,6 +6,7 @@
 
 #include "traits.h"
 #include "handle.h"
+#include "pool.h"
 
 // TODO: be more specific when calling manager, indexer and storage functions 
 // * allows for wider variety of resource setups
@@ -32,65 +33,38 @@ namespace ecs {
 	public:
 		template<traits::component_class T, typename ... arg_Ts>
 		T& init(entity<T> e, arg_Ts&& ... args) {
-			auto& mng = get_manager<T>();
-			auto& ind = get_indexer<T>();
-			auto& str = get_storage<T>();
-			
-			ind.resize(e.value() + 1, entity<T>{ tombstone{} });
-			ind[e.value()] = entity<T>{ (unsigned int)mng.size(), e.version() };
-			mng.emplace_back(e);
-			T& comp = str.emplace_back(std::forward<arg_Ts>(args)...);
-			
-			dispatcher::template on<event::init<T>>().invoke({ e, comp });
-			return comp;
+			return pool<T>().init(e, std::forward<arg_Ts>(args)...);
 		}
 
 		template<traits::component_class T>
 		void terminate(entity<T> e) {
-			auto& mng = get_manager<T>();
-			auto& ind = get_indexer<T>();
-			auto& str = get_storage<T>();
-
-			auto back = mng.size() - 1;
-			dispatcher::template on<event::terminate<T>>().invoke({e, str[back]});
-			
-			auto curr = ind[e.value()].value();
-			ind[e.value()] = tombstone{};
-			
-			if (curr != back) {
-				str[curr] = std::move(str[back]);
-				mng[curr] = std::move(mng[back]);
-			}
-			str.pop_back();
-			mng.pop_back();
+			return pool<T>().terminate(e);
 		}
 
 		template<traits::component_class T, typename ... arg_Ts>
 		T* try_init(entity<T> e, arg_Ts&& ... args) {
-			if (has_component<T>(e)) return nullptr;
-			return &init<T>(e, std::forward<arg_Ts>(args)...);
+			return pool<T>().try_init(e, std::forward<arg_Ts>(args)...);
 		}
 
 		template<traits::component_class T>
 		bool try_terminate(entity<T> e) {
-			if (!has_component<T>(e)) return false;
-			terminate<T>(e); 
-			return true;
+			
+			return pool<T>().try_terminate(e);
 		}
 
 		template<traits::component_class T>
 		T& get_component(entity<T> e) {
-			return get_storage<T>()[get_indexer<T>()[e.value()].value()];
+			return pool<T>()[e];
 		}
 
 		template<traits::component_class T>
 		[[nodiscard]] const T& get_component(entity<T> e) const {
-			return get_storage<T>()[get_indexer<T>()[e.value()].value()];
+			return pool<T>()[e];
 		}
 
 		template<traits::component_class T>
-		[[nodiscard]] bool has_component(entity<T> e) const {
-			return e.value() < get_indexer<T>().size() && e.version() == get_indexer<T>()[e.value()].version();
+		[[nodiscard]] bool has(entity<T> e) const {
+			return pool<T>().contains(e);
 		}
 
 		template<traits::entity_class entity_T = DEFAULT_HANDLE>
@@ -115,15 +89,20 @@ namespace ecs {
 		// template<typename ... select_Ts, typename from_T, typename ... where_Ts>
 		// view<...> view(from_T from, where_Ts... where) { return *this; }
 
-		// template<typename T>
-		// pool<T> pool() { return *this; }
-	private:
-		template<typename T> inline manager<T>& get_manager() { return std::get<manager<T>>(set); }
-		template<typename T> inline indexer<T>& get_indexer() { return std::get<indexer<T>>(set); }
-		template<typename T> inline storage<T>& get_storage() { return std::get<storage<T>>(set); }
-		template<typename T> inline const manager<T>& get_manager() const { return std::get<manager<T>>(set); }
-		template<typename T> inline const indexer<T>& get_indexer() const { return std::get<indexer<T>>(set); }
-		template<typename T> inline const storage<T>& get_storage() const { return std::get<storage<T>>(set); }
+		template<typename T>
+		std::conditional_t<std::is_const_v<T>, const ecs::pool<std::remove_const_t<T>, static_registry<Ts...>>, ecs::pool<T, static_registry<Ts...>>>
+		pool() { return this; }
+
+		template<typename T>
+		const ecs::pool<std::remove_const_t<T>, static_registry<Ts...>> 
+		pool() const { return const_cast<static_registry<Ts...>*>(this); }
+
+		template<typename T> inline manager<T>& get_manager() { return std::get<manager<std::remove_const_t<T>>>(set); }
+		template<typename T> inline indexer<T>& get_indexer() { return std::get<indexer<std::remove_const_t<T>>>(set); }
+		template<typename T> inline storage<T>& get_storage() { return std::get<storage<std::remove_const_t<T>>>(set); }
+		template<typename T> inline manager<const T>& get_manager() const { return std::get<manager<std::remove_const_t<T>>>(set); }
+		template<typename T> inline indexer<const T>& get_indexer() const { return std::get<indexer<std::remove_const_t<T>>>(set); }
+		template<typename T> inline storage<const T>& get_storage() const { return std::get<storage<std::remove_const_t<T>>>(set); }
 	private:
 		resource_set set;
 	};

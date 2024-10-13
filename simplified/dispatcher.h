@@ -84,7 +84,7 @@ namespace ecs
 		{
 			std::lock_guard<std::mutex> lock(mutex);
 			queue.erase(std::remove_if(queue.begin(), queue.end(), [=](auto& listener) { 
-				return listener.first == handle;
+				return listener.handle == handle;
 			}), queue.end());
 		}
 

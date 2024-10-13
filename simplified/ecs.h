@@ -5,3 +5,5 @@
 #include "traits.h"
 #include "tags.h"
 #include "registry.h"
+#include "pool.h"
+#include "view.h"
