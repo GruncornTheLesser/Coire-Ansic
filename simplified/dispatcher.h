@@ -24,7 +24,7 @@ namespace ecs
 	};
 
 	template<typename ... event_Ts>
-	class dispatcher 
+	class dispatcher : private dispatcher<event_Ts>...
 	{
 	public:
 		dispatcher() = default;
@@ -34,7 +34,7 @@ namespace ecs
 		dispatcher& operator=(dispatcher&&) = default;
 
 		template<typename event_T> requires (std::is_same_v<event_T, event_Ts> || ...)
-		dispatcher<event_T>& on() { return std::get<dispatcher<event_T>>(dispatchers); }
+		dispatcher<event_T>& on() { return *static_cast<dispatcher<event_T>*>(this); }
 
 		template<typename event_T> requires (std::is_same_v<event_T, event_Ts> || ...)
 		uint32_t listen(dispatcher<event_T>::handler handler, bool once=false) 
@@ -53,8 +53,6 @@ namespace ecs
 		{ 
 			on<event_T>().invoke(event);
 		}
-	private:
-		std::tuple<dispatcher<event_Ts>...> dispatchers;
 	};
 
 	template<typename event_T>
@@ -70,8 +68,8 @@ namespace ecs
 		dispatcher(dispatcher&&) = default;
 		dispatcher& operator=(dispatcher&&) = default;
 
-		void operator+=(handler_type handler) { listen(handler, false); }
-		void operator^=(handler_type handler) { listen(handler, true); }
+		uint32_t operator+=(handler_type handler) { return listen(handler, false); }
+		uint32_t operator^=(handler_type handler) { return listen(handler, true); }
 
 		uint32_t listen(handler_type handler, bool once=false) 
 		{
@@ -107,7 +105,7 @@ namespace ecs
 		template<typename T> dispatcher<event_T>& on() requires (std::is_same_v<T, event_T>) { return *this; }
 		template<typename T> const dispatcher<event_T>& on() const requires (std::is_same_v<T, event_T>) { return *this; }
 	private:
-		uint32_t current;
+		uint32_t current = 0;
 		queue_type queue;
 		std::mutex mutex; 
 	};

@@ -131,7 +131,7 @@ namespace ecs::traits
 	template<typename T> struct is_storage : std::negation<std::is_void<T>> { };
 	template<typename T> static constexpr bool is_storage_v = is_storage<T>::value;
 
-	template<typename T> struct is_entity : std::negation<std::is_void<T>> { };
+	template<typename T> struct is_entity : std::is_same<traits::get_attribute_t<std::remove_cv_t<T>, attribute::component_tag>, tags::handletype<std::remove_cv_t<T>>> { };
 	template<typename T> static constexpr bool is_entity_v = is_entity<T>::value;
 	template<typename T> concept entity_class = is_entity<T>::value;
 

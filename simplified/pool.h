@@ -69,7 +69,9 @@ namespace ecs {
 	template<typename T, typename reg_T>
 	class pool {
 	public:
-		using value_type = std::tuple<entity<std::remove_const_t<T>>, std::remove_const_t<T>&>;
+		using value_type = std::conditional<std::is_const_v<T>, 
+			const std::tuple<entity<std::remove_cv_t<T>>, std::remove_const_t<T>&>, 
+			std::tuple<entity<T>, T&>>;
 		using reference = proxy_ref<value_type>;
 		using const_reference = proxy_ref<const value_type>;
 
@@ -79,11 +81,6 @@ namespace ecs {
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 		pool(reg_T* reg) : reg(reg) { }
-
-		template<std::input_iterator It>
-		//void assign(It first, It last);
-		//void assign(size_t n, const T& value);
-		//void assign(std::initializer_list<std::pair<entity<T>, T>> ilist);
 
 		// iterators
 		constexpr iterator begin() noexcept { return { reg, 0 }; }
@@ -108,8 +105,8 @@ namespace ecs {
 		constexpr size_t size() const { return reg->template get_manager<T>().size(); }
 		constexpr size_t capacity() const { return reg->template get_manager<T>().capacity(); }
 		constexpr void reserve(size_t n) { 
-			reg->template get_manager<T>().reserve(n); 
-			reg->template get_storage<T>().reserve(n); 
+			reg->template get_manager<T>().reserve(n);
+			reg->template get_storage<T>().reserve(n);
 		}
 		constexpr void shrink_to_fit() {
 			size_t n = size();
@@ -179,7 +176,6 @@ namespace ecs {
 			return e.value() < reg->template get_indexer<T>().size() && e.version() == reg->template get_indexer<T>()[e.value()].version();
 		}
 
-
 		// modifiers
 		template<typename ... arg_Ts>
 		constexpr T& init(entity<T> e, arg_Ts&&... args)
@@ -187,13 +183,13 @@ namespace ecs {
 			auto& mng = reg->template get_manager<T>();
 			auto& ind = reg->template get_indexer<T>();
 			auto& str = reg->template get_storage<T>();
-			
+			auto& inv = reg->template on<event::init<T>>();
+
 			ind.resize(e.value() + 1, entity<T>{ tombstone{} });
 			ind[e.value()] = entity<T>{ (unsigned int)mng.size(), e.version() };
 			mng.emplace_back(e);
 
-			T& component = str.emplace_back(std::forward<arg_Ts>(args)...);
-			reg->template on<event::init<T>>().invoke({ e, component });
+			inv.invoke({ e, str.emplace_back(std::forward<arg_Ts>(args)...); });
 			return component;
 		}
 
@@ -201,16 +197,17 @@ namespace ecs {
 			auto& mng = reg->template get_manager<T>();
 			auto& ind = reg->template get_indexer<T>();
 			auto& str = reg->template get_storage<T>();
-
+			auto& inv = reg->template on<event::terminate<T>>();
+			
 			auto back = mng.size() - 1;
-			reg->template on<event::terminate<T>>().invoke({e, str[back]});
+			inv.invoke({e, str[back]});
 			
 			auto curr = ind[e.value()].value();
 			ind[e.value()] = tombstone{};
 			
 			if (curr != back) {
-				str[curr] = std::move(str[back]);
-				mng[curr] = std::move(mng[back]);
+				std::swap(str[curr], str[back]);
+				std::swap(mng[curr], mng[back]);
 			}
 			str.pop_back();
 			mng.pop_back();
@@ -220,9 +217,10 @@ namespace ecs {
 			auto& mng = reg->template get_manager<T>();
 			auto& ind = reg->template get_indexer<T>();
 			auto& str = reg->template get_storage<T>();
+			auto& inv = reg->template on<event::terminate<T>>();
 			
 			for (int i=0; i<size(); ++i) {
-				reg->template on<event::terminate<T>>().invoke({mng[i], str[i]});
+				inv.invoke({mng[i], str[i]});
 				ind[i] = tombstone{};
 			}
 			mng.clear();

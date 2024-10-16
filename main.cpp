@@ -39,10 +39,10 @@ int main() {
 	using namespace ecs::event;
 
 	registry<A, B, C, D> reg;
-	reg.on<init<A>>() ^= [](const init<A>& e) { std::cout << "fire once event init A" << std::endl; };
-	reg.on<terminate<A>>() += [](const terminate<A>& e) { std::cout << "terminate A" << std::endl; };
+	auto log_init = reg.on<init<A>>() ^= [](const init<A>& e) { std::cout << "init A fire once" << std::endl; };
+	auto log_terminate = reg.on<terminate<A>>() += [](const terminate<A>& e) { std::cout << "terminate A" << std::endl; };
 	auto log_create = reg.on<create<>>().listen([](const create<>& e) { std::cout << "create entity" << std::endl; });
-	reg.on<destroy<>>() += [](const destroy<>& e) { std::cout << "destroy entity" << std::endl; };
+	auto log_destroy = reg.on<destroy<>>() += [](const destroy<>& e) { std::cout << "destroy entity" << std::endl; };
 
 	auto e = reg.create(); 			// create entity
 	reg.init<A>(e);					// create component
@@ -57,8 +57,20 @@ int main() {
 	reg.destroy(e);					// destroy entity, also terminate component
 	assert(!reg.alive(e));
 
-	reg.on<terminate<A>>().detach_all();
-	reg.on<create<>>().detach(log_create);
+
+	std::vector<handle> entities(64);
+	for (int i = 0; i < 64; ++i)
+		entities[i] = reg.create<handle>();
+
+	for (int i = 0; i < 40; ++i)
+		reg.init<A>(entities[i]);
+	
+	for (int i = 16; i < 48; ++i)
+		reg.init<B>(entities[i]);
+	
+	for (int i = 24; i < 64; ++i)
+		reg.init<C>(entities[i]);
+	
 
 	
 	auto beg = reg.pool<A>().cbegin();
@@ -69,11 +81,28 @@ int main() {
 		auto [e, a] = *curr;
 	}
 
-	for (auto [e, a] : reg.pool<A>()) { }
-	for (auto [e, a] : reg.pool<const A>()) { }
-	for (auto [e, a] : ((const ecs::registry<A>&)(reg)).pool<const A>()) { }
-	//for (auto [e, a, b] : reg.view<A, B>()) { }
+	std::cout << "---pool<A>---" << std::endl;
+	for (auto [e, a] : reg.pool<A>()) { std::cout << e.value() << ","; }
 	
+	std::cout << "\n---pool<B>---" << std::endl;
+	for (auto [e, b] : reg.pool<B>()) { std::cout << e.value() << ","; }
+		
+	std::cout << "\n---const pool<C>---" << std::endl;
+	for (auto [e, b] : reg.pool<C>()) { std::cout << e.value() << ","; }
+		
+	std::cout << "\n---view<entity, A>---" << std::endl;
+	for (auto [e, a] : reg.view<ecs::handle, A>()) { std::cout << e.value() << ","; }
+	
+	std::cout << "\n---view<entity, B>---" << std::endl;
+	for (auto [e, a] : reg.view<ecs::handle, B>()) { std::cout << e.value() << ","; }
 
+	std::cout << "\n---view<entity, C>---" << std::endl;
+	for (auto [e, a] : reg.view<ecs::handle, C>()) { std::cout << e.value() << ","; }
+
+	std::cout << "\n---view<entity, A, B>---" << std::endl;
+	for (auto [e, a, b] : reg.view<handle, A, B>()) { std::cout << e.value() << ","; }
+	
+	std::cout << "\n---view<entity, B, C>---" << std::endl;
+	for (auto [e, b, c] : reg.view<handle, B, C>()) { std::cout << e.value() << ","; }
 }
 

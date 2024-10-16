@@ -7,6 +7,7 @@
 #include "traits.h"
 #include "handle.h"
 #include "pool.h"
+#include "view.h"
 
 // TODO: be more specific when calling manager, indexer and storage functions 
 // * allows for wider variety of resource setups
@@ -31,6 +32,20 @@ namespace ecs {
 			traits::get_storage_t<Ts>...
 			>>;
 	public:
+		static_registry() = default;
+		static_registry(const static_registry&) = delete;
+		static_registry& operator=(const static_registry&) = delete;
+		static_registry(static_registry&&) = default;
+		static_registry& operator=(static_registry&&) = default;
+
+
+		~static_registry() {
+			(pool<Ts>().clear(), ...);
+			// destroy all entities
+			
+		}
+
+
 		template<traits::component_class T, typename ... arg_Ts>
 		T& init(entity<T> e, arg_Ts&& ... args) {
 			return pool<T>().init(e, std::forward<arg_Ts>(args)...);
@@ -53,18 +68,23 @@ namespace ecs {
 		}
 
 		template<traits::component_class T>
-		T& get_component(entity<T> e) {
+		T& get(entity<T> e) {
 			return pool<T>()[e];
 		}
 
 		template<traits::component_class T>
-		[[nodiscard]] const T& get_component(entity<T> e) const {
+		[[nodiscard]] const T& get(entity<T> e) const {
 			return pool<T>()[e];
 		}
 
 		template<traits::component_class T>
 		[[nodiscard]] bool has(entity<T> e) const {
 			return pool<T>().contains(e);
+		}
+
+		template<traits::component_class T>
+		[[nodiscard]] size_t count() const {
+			return pool<T>().size();
 		}
 
 		template<traits::entity_class entity_T = DEFAULT_HANDLE>
@@ -86,12 +106,14 @@ namespace ecs {
 			return get_manager<entity_T>().alive(e);
 		}
 
-		// template<typename ... select_Ts, typename from_T, typename ... where_Ts>
-		// view<...> view(from_T from, where_Ts... where) { return *this; }
+		template<typename ... select_Ts, 
+			typename from_T=ecs::default_from<ecs::select<select_Ts...>>, 
+			typename where_T=ecs::default_where<ecs::select<select_Ts...>, ecs::from<from_T>>>
+		ecs::view<ecs::select<select_Ts...>, from_T, where_T, static_registry<Ts...>>
+		view(from_T from=from_T{}, where_T where=where_T{}) { return this; }
 
 		template<typename T>
-		std::conditional_t<std::is_const_v<T>, const ecs::pool<std::remove_const_t<T>, static_registry<Ts...>>, ecs::pool<T, static_registry<Ts...>>>
-		pool() { return this; }
+		ecs::pool<T, static_registry<Ts...>> pool() { return this; }
 
 		template<typename T>
 		const ecs::pool<std::remove_const_t<T>, static_registry<Ts...>> 
