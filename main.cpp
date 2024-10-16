@@ -23,6 +23,12 @@
 
 
 
+
+
+
+// ! THERE IS UGLY CONST CASTING AROUND REGISTRY, POOL, POOL_ITERATOR
+
+
 #include "simplified\ecs.h"
 #include <iostream>
 #include <cassert>
@@ -45,18 +51,42 @@ int main() {
 	auto log_destroy = reg.on<destroy<>>() += [](const destroy<>& e) { std::cout << "destroy entity" << std::endl; };
 
 	auto e = reg.create(); 			// create entity
+	assert(reg.alive(e));
+
+	assert(!reg.has<A>(e));			// assert entity does not have component
 	reg.init<A>(e);					// create component
 	assert(reg.has<A>(e));			// assert entity has component
-	
-	assert(!reg.has<B>(e));			// assert entity does not have component
-	reg.init<B>(e);					// create component
-	assert(reg.has<B>(e));			// assert entity has component
-	reg.terminate<B>(e);			// create component
-	assert(!reg.has<B>(e));			// assert entity does not have component
+	reg.terminate<A>(e);			// create component
+	assert(!reg.has<A>(e));			// assert entity does not have component
 	
 	reg.destroy(e);					// destroy entity, also terminate component
 	assert(!reg.alive(e));
 
+
+	for (auto [e, d] : reg.pool<D>()) { 
+		static_assert(std::is_same_v<decltype(d), D&>);
+		static_assert(std::is_same_v<decltype(e), ecs::handle>);
+	}
+
+	for (auto [e, d] : reg.pool<const D>()) { 
+		static_assert(std::is_same_v<decltype(d), const D&>);
+		static_assert(std::is_same_v<decltype(e), const ecs::handle>);
+	}
+
+	for (auto [e, d] : reg.view<ecs::handle, D>()) { 
+		static_assert(std::is_same_v<decltype(d), D&>);
+		static_assert(std::is_same_v<decltype(e), ecs::handle>);
+	}
+
+	for (auto [e, d] : reg.view<ecs::handle, const D>()) { 
+		static_assert(std::is_same_v<decltype(d), const D&>);
+		static_assert(std::is_same_v<decltype(e), ecs::handle>);
+	}
+
+	for (const auto& [e, d] : reg.view<ecs::handle, const D>()) { 
+		static_assert(std::is_same_v<decltype(d), const D&>);
+		static_assert(std::is_same_v<decltype(e), const ecs::handle>);
+	}
 
 	std::vector<handle> entities(64);
 	for (int i = 0; i < 64; ++i)
@@ -72,17 +102,18 @@ int main() {
 		reg.init<C>(entities[i]);
 	
 
-	
-	auto beg = reg.pool<A>().cbegin();
-	auto end = reg.pool<A>().cend();
-	
-	for (auto curr=beg; curr != end; ++curr) {
-		std::tuple<ecs::entity<A>, A&> rf = *curr;
-		auto [e, a] = *curr;
+	std::cout << "---pool<A>---" << std::endl;
+	for (auto [e, a] : reg.pool<A>()) { 
+		std::cout << e.value() << ",";
+		static_assert(std::is_same_v<decltype(a), A&>);
+		static_assert(std::is_same_v<decltype(e), ecs::handle>);
 	}
 
 	std::cout << "---pool<A>---" << std::endl;
-	for (auto [e, a] : reg.pool<A>()) { std::cout << e.value() << ","; }
+	for (auto [e, a] : reg.pool<const A>()) { 
+		static_assert(std::is_same_v<decltype(a), const A&>);
+		static_assert(std::is_same_v<decltype(e), const ecs::handle>);
+	}
 	
 	std::cout << "\n---pool<B>---" << std::endl;
 	for (auto [e, b] : reg.pool<B>()) { std::cout << e.value() << ","; }

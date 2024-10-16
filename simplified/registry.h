@@ -113,7 +113,8 @@ namespace ecs {
 		view(from_T from=from_T{}, where_T where=where_T{}) { return this; }
 
 		template<typename T>
-		ecs::pool<T, static_registry<Ts...>> pool() { return this; }
+		std::conditional_t<std::is_const_v<T>, const ecs::pool<T, static_registry<Ts...>>, ecs::pool<T, static_registry<Ts...>>> 
+		pool() { return { this }; }
 
 		template<typename T>
 		const ecs::pool<std::remove_const_t<T>, static_registry<Ts...>> 

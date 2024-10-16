@@ -69,9 +69,7 @@ namespace ecs {
 	template<typename T, typename reg_T>
 	class pool {
 	public:
-		using value_type = std::conditional<std::is_const_v<T>, 
-			const std::tuple<entity<std::remove_cv_t<T>>, std::remove_const_t<T>&>, 
-			std::tuple<entity<T>, T&>>;
+		using value_type = std::tuple<entity<std::remove_cv_t<T>>, std::remove_const_t<T>&>;
 		using reference = proxy_ref<value_type>;
 		using const_reference = proxy_ref<const value_type>;
 
@@ -80,7 +78,7 @@ namespace ecs {
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-		pool(reg_T* reg) : reg(reg) { }
+		constexpr pool(reg_T* reg) noexcept : reg(reg) { }
 
 		// iterators
 		constexpr iterator begin() noexcept { return { reg, 0 }; }
@@ -177,7 +175,7 @@ namespace ecs {
 		}
 
 		// modifiers
-		template<typename ... arg_Ts>
+		template<typename ... arg_Ts> requires (std::is_constructible_v<T, arg_Ts...>)
 		constexpr T& init(entity<T> e, arg_Ts&&... args)
 		{
 			auto& mng = reg->template get_manager<T>();
