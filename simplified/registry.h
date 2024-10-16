@@ -133,5 +133,8 @@ namespace ecs {
 	using registry = std::conditional_t<std::tuple_size_v<std::tuple<Ts...>> == 0, dynamic_registry, static_registry<Ts...>>;
 }
 
-// example entity
-// struct my_entity : entity<> { };
+
+
+
+static_assert(std::bidirectional_iterator<ecs::view_iterator<ecs::select<int>, ecs::from<int>, ecs::include<int>, ecs::registry<int>>>);
+static_assert(std::ranges::bidirectional_range<ecs::view<ecs::select<int>, ecs::from<int>, ecs::include<int>, ecs::static_registry<int>>>);

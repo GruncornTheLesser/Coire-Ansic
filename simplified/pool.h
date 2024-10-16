@@ -189,7 +189,8 @@ namespace ecs {
 			ind[e.value()] = entity<T>{ (unsigned int)mng.size(), e.version() };
 			mng.emplace_back(e);
 
-			inv.invoke({ e, str.emplace_back(std::forward<arg_Ts>(args)...); });
+			T& component = str.emplace_back(std::forward<arg_Ts>(args)...);
+			inv.invoke({ e, component });
 			return component;
 		}
 

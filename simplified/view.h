@@ -184,7 +184,4 @@ namespace ecs {
 	private:
 		reg_T* reg;
 	};
-
-	static_assert(std::bidirectional_iterator<ecs::view_iterator<ecs::select<int>, ecs::from<int>, ecs::include<int>, ecs::registry<int>>>);
-	static_assert(std::ranges::bidirectional_range<view<select<int>, from<int>, include<int>, static_registry<int>>>);
 }
