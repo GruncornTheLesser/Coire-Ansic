@@ -1,7 +1,8 @@
 #pragma once
 
-#include "handle.h"
-#include "entity_manager.h"
+#include "entity.h"
+#include "handle_manager.h"
+#include "dispatcher.h"
 #include "traits.h"
 #include "tags.h"
 #include "registry.h"

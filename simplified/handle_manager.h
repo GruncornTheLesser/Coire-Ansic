@@ -5,7 +5,7 @@
 namespace ecs {
 
 	template<typename T, typename Alloc_T>
-	class entity_manager
+	class handle_manager
 	{
 		using value_type = typename T::value_type;
 		using version_type = typename T::version_type;
@@ -25,7 +25,7 @@ namespace ecs {
 }
 
 template<typename T, typename Alloc_T>
-T ecs::entity_manager<T, Alloc_T>::create()
+T ecs::handle_manager<T, Alloc_T>::create()
 {
 	value_type value;
 	version_type version;
@@ -47,7 +47,7 @@ T ecs::entity_manager<T, Alloc_T>::create()
 
 
 template<typename T, typename Alloc_T>
-void ecs::entity_manager<T, Alloc_T>::destroy(T e) {
+void ecs::handle_manager<T, Alloc_T>::destroy(T e) {
 	value_type value = e.value();
 	version_type version = e.version();
 
@@ -61,6 +61,6 @@ void ecs::entity_manager<T, Alloc_T>::destroy(T e) {
 }
 
 template<typename T, typename Alloc_T>
-bool ecs::entity_manager<T, Alloc_T>::alive(T e) const {
+bool ecs::handle_manager<T, Alloc_T>::alive(T e) const {
 	return e.version() == active[e.value()];
 }

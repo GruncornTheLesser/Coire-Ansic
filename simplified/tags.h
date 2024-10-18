@@ -12,12 +12,12 @@ namespace ecs {
 }
 
 namespace ecs::event {
-	template<typename T> struct init { entity<T> e; T& comp; }; // component construction
-	template<typename T> struct terminate { entity<T> e; T& comp; }; // component destruction
+	template<typename T> struct init { handle<T> e; T& comp; }; // component construction
+	template<typename T> struct terminate { handle<T> e; T& comp; }; // component destruction
 	
-	template<typename entity_T> struct create { entity_T e; }; // entity construction
-	template<typename entity_T> struct destroy { entity_T e; }; // entity destruction
-	// template<typename T> struct update { entity e; };
+	template<typename handle_T> struct create { handle_T e; }; // handle construction
+	template<typename handle_T> struct destroy { handle_T e; }; // handle destruction
+	// template<typename T> struct update { handle e; };
 }
 
 // defaults are wrapped to make them uniques identifiable
@@ -26,7 +26,7 @@ namespace ecs::tags
 	template<typename T>
 	struct basictype
 	{
-		using default_entity = DEFAULT_HANDLE;
+		using default_handle = DEFAULT_HANDLE;
 		using default_events = DEFAULT_EVENTS;
 		template<typename U> requires (std::is_same_v<U, T>) using default_manager = component_manager<T>;
 		template<typename U> requires (std::is_same_v<U, T>) using default_indexer = component_indexer<T>;
@@ -39,7 +39,7 @@ namespace ecs::tags
 	private:
 		using value_type = util::find_min_t<std::tuple<Ts...>, util::get_type_ID>;
 	public:
-		using default_entity = DEFAULT_HANDLE;
+		using default_handle = DEFAULT_HANDLE;
 		using default_events = std::tuple<ecs::event::init<value_type>, ecs::event::terminate<value_type>>;
 		template<typename U> requires (std::is_same_v<U, Ts> || ...) using default_manager = component_manager<value_type>;
 		template<typename U> requires (std::is_same_v<U, Ts> || ...) using default_indexer = component_indexer<value_type>;
@@ -53,7 +53,7 @@ namespace ecs::tags
 		using shared_type = util::find_min_t<std::tuple<Ts...>, util::get_type_ID>; // get unique type ID for set
 		using value_type = util::sort_t<std::variant<Ts...>, util::cmp::lt_<util::get_type_ID>::template type>; // sorted so consistent order
 	public:
-		using default_entity = DEFAULT_HANDLE;
+		using default_handle = DEFAULT_HANDLE;
 		using default_events = std::tuple<ecs::event::init<value_type>, ecs::event::terminate<value_type>>;
 		template<typename U> requires (std::is_same_v<U, Ts> || ...) using default_manager = component_manager<shared_type>;
 		template<typename U> requires (std::is_same_v<U, Ts> || ...) using default_indexer = component_indexer<shared_type>;
@@ -63,9 +63,9 @@ namespace ecs::tags
 	template<typename T>
 	struct handletype
 	{
-		using default_entity = void;
+		using default_handle = void;
 		using default_events = std::tuple<ecs::event::create<T>, ecs::event::destroy<T>>;
-		template<typename U> requires (std::is_same_v<T, U>) using default_manager = entity_manager<T>;
+		template<typename U> requires (std::is_same_v<T, U>) using default_manager = handle_manager<T>;
 		template<typename U> requires (std::is_same_v<U, T>) using default_indexer = void;
 		template<typename U> requires (std::is_same_v<U, T>) using default_storage = void;
 	};

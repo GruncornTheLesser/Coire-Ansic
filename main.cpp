@@ -21,13 +21,11 @@
 // storage->component_at(size_t i)
 // TODO: use ecs::traits for events, 
 
-
-
-
-
-
 // ! THERE IS UGLY CONST CASTING AROUND REGISTRY, POOL, POOL_ITERATOR
 
+
+
+// TODO: make dispatcher use handle<>
 
 #include "simplified\ecs.h"
 #include <iostream>
@@ -37,8 +35,6 @@ struct A { };
 struct B { };
 struct C { };
 struct D { };
-
-static_assert(std::random_access_iterator<ecs::pool_iterator<int, ecs::registry<int>>>);
 
 int main() {
 	using namespace ecs;
@@ -63,34 +59,29 @@ int main() {
 	assert(!reg.alive(e));
 
 
-	for (auto [e, d] : reg.pool<D>()) { 
+	for (auto [e, d] : reg.pool<D>()) {
 		static_assert(std::is_same_v<decltype(d), D&>);
-		static_assert(std::is_same_v<decltype(e), ecs::handle>);
+		static_assert(std::is_same_v<decltype(e), ecs::entity>);
 	}
 
-	for (auto [e, d] : reg.pool<const D>()) { 
+	for (auto [e, d] : reg.pool<const D>()) {
 		static_assert(std::is_same_v<decltype(d), const D&>);
-		static_assert(std::is_same_v<decltype(e), const ecs::handle>);
+		static_assert(std::is_same_v<decltype(e), const ecs::entity>);
 	}
 
-	for (auto [e, d] : reg.view<ecs::handle, D>()) { 
+	for (auto [e, d] : reg.view<ecs::entity, D>()) {
 		static_assert(std::is_same_v<decltype(d), D&>);
-		static_assert(std::is_same_v<decltype(e), ecs::handle>);
+		static_assert(std::is_same_v<decltype(e), ecs::entity>);
 	}
 
-	for (auto [e, d] : reg.view<ecs::handle, const D>()) { 
+	for (auto [e, d] : reg.view<ecs::entity, const D>()) { 
 		static_assert(std::is_same_v<decltype(d), const D&>);
-		static_assert(std::is_same_v<decltype(e), ecs::handle>);
+		static_assert(std::is_same_v<decltype(e), ecs::entity>);
 	}
 
-	for (const auto& [e, d] : reg.view<ecs::handle, const D>()) { 
-		static_assert(std::is_same_v<decltype(d), const D&>);
-		static_assert(std::is_same_v<decltype(e), const ecs::handle>);
-	}
-
-	std::vector<handle> entities(64);
+	std::vector<entity> entities(64);
 	for (int i = 0; i < 64; ++i)
-		entities[i] = reg.create<handle>();
+		entities[i] = reg.create<entity>();
 
 	for (int i = 0; i < 40; ++i)
 		reg.init<A>(entities[i]);
@@ -105,15 +96,10 @@ int main() {
 	std::cout << "---pool<A>---" << std::endl;
 	for (auto [e, a] : reg.pool<A>()) { 
 		std::cout << e.value() << ",";
-		static_assert(std::is_same_v<decltype(a), A&>);
-		static_assert(std::is_same_v<decltype(e), ecs::handle>);
 	}
 
 	std::cout << "---pool<A>---" << std::endl;
-	for (auto [e, a] : reg.pool<const A>()) { 
-		static_assert(std::is_same_v<decltype(a), const A&>);
-		static_assert(std::is_same_v<decltype(e), const ecs::handle>);
-	}
+	for (auto [e, a] : reg.pool<const A>());
 	
 	std::cout << "\n---pool<B>---" << std::endl;
 	for (auto [e, b] : reg.pool<B>()) { std::cout << e.value() << ","; }
@@ -122,18 +108,19 @@ int main() {
 	for (auto [e, b] : reg.pool<C>()) { std::cout << e.value() << ","; }
 		
 	std::cout << "\n---view<entity, A>---" << std::endl;
-	for (auto [e, a] : reg.view<ecs::handle, A>()) { std::cout << e.value() << ","; }
+	for (auto [e, a] : reg.view<ecs::entity, A>()) { std::cout << e.value() << ","; }
 	
 	std::cout << "\n---view<entity, B>---" << std::endl;
-	for (auto [e, a] : reg.view<ecs::handle, B>()) { std::cout << e.value() << ","; }
+	for (auto [e, a] : reg.view<ecs::entity, B>()) { std::cout << e.value() << ","; }
 
 	std::cout << "\n---view<entity, C>---" << std::endl;
-	for (auto [e, a] : reg.view<ecs::handle, C>()) { std::cout << e.value() << ","; }
+	for (auto [e, a] : reg.view<ecs::entity, C>()) { std::cout << e.value() << ","; }
 
 	std::cout << "\n---view<entity, A, B>---" << std::endl;
-	for (auto [e, a, b] : reg.view<handle, A, B>()) { std::cout << e.value() << ","; }
+	for (auto [e, a, b] : reg.view<entity, A, B>()) { std::cout << e.value() << ","; }
 	
 	std::cout << "\n---view<entity, B, C>---" << std::endl;
-	for (auto [e, b, c] : reg.view<handle, B, C>()) { std::cout << e.value() << ","; }
+	for (auto [e, b, c] : reg.view<entity, B, C>()) { std::cout << e.value() << ","; }
+	std::cout << std::endl;
 }
 

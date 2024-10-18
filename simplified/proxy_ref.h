@@ -28,4 +28,9 @@ namespace std {
 	template<size_t I, typename T> constexpr decltype(auto) get(ecs::proxy_ref<T>& ref) { return std::get<I>(*ref); }
 	template<size_t I, typename T> constexpr decltype(auto) get(const ecs::proxy_ref<T>& ref) { return std::get<I>(*ref); }
 	template<size_t I, typename T> constexpr decltype(auto) get(ecs::proxy_ref<T>&& ref) { return std::get<I>(std::move(*ref)); }
+	
+	template<typename U, typename T> constexpr decltype(auto) get(ecs::proxy_ref<T>& ref) { return std::get<U>(*ref); }
+	template<typename U, typename T> constexpr decltype(auto) get(const ecs::proxy_ref<T>& ref) { return std::get<U>(*ref); }
+	template<typename U, typename T> constexpr decltype(auto) get(ecs::proxy_ref<T>&& ref) { return std::get<U>(std::move(*ref)); }
+	
 }

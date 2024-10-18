@@ -8,37 +8,34 @@ namespace ecs {
 	struct tombstone { };
 
 	//template<std::unsigned_integral T, std::unsigned_integral V>
-	struct handle
+	struct entity
 	{	
-		using T = uint32_t;
-		using V = uint32_t;
+using component_tag = ecs::tags::handletype<entity>;
 
-		using component_tag = ecs::tags::handletype<handle>;
-
-		template<typename,typename> friend class entity_manager;
+		template<typename,typename> friend class handle_manager;
 		template<typename, typename> friend class pool;
 		
-		using value_type = T;
-		using version_type = V;
+		using value_type = uint32_t;
+		using version_type = uint32_t;
 
 	private:
-	 	handle(value_type value, version_type version) : val(value), ver(version) { }
-		handle(tombstone) : ver(0) { }
-		handle& operator=(tombstone) { ver = 0; return *this; }
+	 	entity(value_type value, version_type version) : val(value), ver(version) { }
+		entity(tombstone) : ver(0) { }
+		entity& operator=(tombstone) { ver = 0; return *this; }
 		void destroy() { ver = 0; }
 	public:
-		handle() : val(0), ver(0) { }
-		handle(const handle& other) = default;
-		handle& operator=(const handle& other) = default;
+		entity() : val(0), ver(0) { }
+		entity(const entity& other) = default;
+		entity& operator=(const entity& other) = default;
 		operator uint32_t() const { 
 			return val; 
 		}
 
-		bool operator==(const handle& other) const { 
+		bool operator==(const entity& other) const { 
 			return val == other.val && ver == other.ver; 
 		}
 
-		bool operator!=(const handle& other) const { 
+		bool operator!=(const entity& other) const { 
 			return val == other.val && ver == other.ver; 
 		}
 
