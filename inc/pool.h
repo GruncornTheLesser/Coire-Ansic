@@ -1,24 +1,19 @@
 #pragma once
 #include "traits.h"
-#include "registry.h"
 #include "proxy_ref.h"
 #include "macros.h"
+#include <stdexcept>
 
 namespace ecs {
 	template<typename T, typename reg_T>
 	class pool_iterator {
 	public:
+		using handle_type = traits::get_component_handle_t<std::remove_const_t<T>>;
+
 		using iterator_category = std::random_access_iterator_tag;
-		using value_type = std::tuple<handle<std::remove_const_t<T>>, std::remove_const_t<T>&>;
+		using value_type = std::tuple<handle_type, std::remove_const_t<T>&>;
 		using reference = proxy_ref<std::conditional_t<std::is_const_v<T>, const value_type, value_type>>;
 		using difference_type = std::ptrdiff_t;
-
-		pool_iterator() : reg(nullptr), ind(0) { }
-		pool_iterator(reg_T* reg, size_t ind) : reg(reg), ind(ind) { }
-		pool_iterator(const pool_iterator& other) : reg(other.reg), ind(other.ind) { }
-		pool_iterator& operator=(const pool_iterator& other) { reg = other.reg; ind = other.ind; }
-		pool_iterator(pool_iterator&& other) : reg(other.reg), ind(other.ind) { }
-		pool_iterator& operator=(pool_iterator&& other) { reg = other.reg; ind = other.ind; }
 
 		operator pool_iterator<const T, reg_T>() const { return { const_cast<reg_T*>(reg), ind }; }
 
@@ -71,15 +66,28 @@ namespace ecs {
 	template<typename T, typename reg_T>
 	class pool {
 	public:
-		using value_type = std::tuple<handle<std::remove_cv_t<T>>, std::remove_const_t<T>&>;
+
+
+		using registry_type = reg_T;
+		using handle_type = handle_t<std::remove_const_t<T>>;
+		using manager_type = std::conditional_t<std::is_const_v<T>, 
+			const traits::get_component_manager_t<std::remove_const_t<T>>, 
+			traits::get_component_manager_t<T>>;
+		using indexer_type = std::conditional_t<std::is_const_v<T>, 
+			const traits::get_component_indexer_t<std::remove_const_t<T>>, 
+			traits::get_component_indexer_t<T>>;
+		using storage_type = std::conditional_t<std::is_const_v<T>, 
+			const traits::get_component_storage_t<std::remove_const_t<T>>, 
+			traits::get_component_storage_t<T>>;
+		
+		using value_type = std::tuple<handle_type, std::remove_const_t<T>&>;
 		using reference = proxy_ref<value_type>;
 		using const_reference = proxy_ref<const value_type>;
-
 		using iterator = pool_iterator<T, reg_T>;
 		using const_iterator = pool_iterator<const T, reg_T>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-
+		
 		constexpr pool(reg_T* reg) noexcept : reg(reg) { }
 
 		// iterators
@@ -122,11 +130,11 @@ namespace ecs {
 			return { reg->template get_manager<T>()[index], reg->template get_storage<T>()[index] }; 
 		}
 		
-		constexpr reference operator[](handle<T> e) {
+		constexpr reference operator[](handle_type e) {
 			auto index = reg->template get_indexer<T>()[e.value()].value();
 			return { reg->template get_manager<T>()[index], reg->template get_storage<T>()[index] }; 
 		}
-		constexpr const reference operator[](handle<T> e) const {
+		constexpr const reference operator[](handle_type e) const {
 			auto index = reg->template get_indexer<T>()[e.value()].value();
 			return { reg->template get_manager<T>()[index], reg->template get_storage<T>()[index] }; 
 		}
@@ -140,12 +148,12 @@ namespace ecs {
 			return { reg->template get_manager<T>()[pos], reg->template get_storage<T>()[pos] }; 
 		}
 
-		constexpr T& get(handle<T> e) {
+		constexpr T& get(handle_type e) {
 			if (!contains(e)) throw std::out_of_range("");
 			size_t index = index_of(e);
 			return { reg->template get_manager<T>()[index], reg->template get_storage<T>()[index] }; 
 		}
-		constexpr const T& get(handle<T> e) const {
+		constexpr const T& get(handle_type e) const {
 			if (!contains(e)) throw std::out_of_range("");
 			size_t index = index_of(e);
 			return { reg->template get_manager<T>()[index], reg->template get_storage<T>()[index] }; 
@@ -167,28 +175,28 @@ namespace ecs {
 			return { reg->template get_manager<T>()[index], reg->template get_storage<T>()[index] };			
 		}
 		
-		constexpr size_t index_of(handle<T> e) const {
+		constexpr size_t index_of(handle_type e) const {
 			auto val = e.value();
 			if (e.value() >= reg->template get_indexer<T>().size()) throw std::out_of_range("");
 			if (e.version() != reg->template get_indexer<T>()[e.value()].version()) throw std::out_of_range("");
 			return reg->template get_indexer<T>()[e.value()].value();
 		}
 
-		[[nodiscard]] bool contains(handle<T> e) const {
+		[[nodiscard]] bool contains(handle_type e) const {
 			return e.value() < reg->template get_indexer<T>().size() && e.version() == reg->template get_indexer<T>()[e.value()].version();
 		}
 
 		// modifiers
 		template<typename ... arg_Ts> requires (std::is_constructible_v<T, arg_Ts...>)
-		constexpr T& init(handle<T> e, arg_Ts&&... args)
+		constexpr T& init(handle_type e, arg_Ts&&... args)
 		{
 			auto& mng = reg->template get_manager<T>();
 			auto& ind = reg->template get_indexer<T>();
 			auto& str = reg->template get_storage<T>();
-			auto& inv = reg->template on<event::init<T>>();
+			auto& inv = reg->template on<ecs::init<T>>();
 
-			ind.resize(e.value() + 1, handle<T>{ tombstone{} });
-			ind[e.value()] = handle<T>{ (unsigned int)mng.size(), e.version() };
+			ind.resize(e.value() + 1, handle_type{ tombstone{} });
+			ind[e.value()] = handle_type{ (unsigned int)mng.size(), e.version() };
 			mng.emplace_back(e);
 
 			T& component = str.emplace_back(std::forward<arg_Ts>(args)...);
@@ -196,11 +204,11 @@ namespace ecs {
 			return component;
 		}
 
-		constexpr void terminate(handle<T> e) {
+		constexpr void terminate(handle_type e) {
 			auto& mng = reg->template get_manager<T>();
 			auto& ind = reg->template get_indexer<T>();
 			auto& str = reg->template get_storage<T>();
-			auto& inv = reg->template on<event::terminate<T>>();
+			auto& inv = reg->template on<ecs::terminate<T>>();
 			
 			auto back = mng.size() - 1;
 			inv.invoke({e, str[back]});
@@ -220,7 +228,7 @@ namespace ecs {
 			auto& mng = reg->template get_manager<T>();
 			auto& ind = reg->template get_indexer<T>();
 			auto& str = reg->template get_storage<T>();
-			auto& inv = reg->template on<event::terminate<T>>();
+			auto& inv = reg->template on<ecs::terminate<T>>();
 			
 			for (int i=0; i<size(); ++i) {
 				inv.invoke({mng[i], str[i]});
@@ -231,12 +239,12 @@ namespace ecs {
 		}
 
 		template<typename ... arg_Ts>
-		T* try_init(handle<T> e, arg_Ts&& ... args) {
+		T* try_init(handle_type e, arg_Ts&& ... args) {
 			if (contains(e)) return nullptr;
 			return &init(e, std::forward<arg_Ts>(args)...);
 		}
 
-		bool try_terminate(handle<T> e) {
+		bool try_terminate(handle_type e) {
 			if (!contains(e)) return false;
 			terminate(e); 
 			return true;

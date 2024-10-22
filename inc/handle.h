@@ -1,4 +1,57 @@
 #pragma once
+#include <stdint.h>
+#include "traits.h"
+#include "resource.h"
+
+namespace ecs {
+	template<typename T>
+	struct create { 
+		using event_tag = ecs::tag::event::sync; 
+		T value; 
+	};
+	template<typename T> struct destroy { using event_tag = ecs::tag::event::sync; T value; };
+
+	template<typename T>
+	struct generator {
+		using resource_tag = ecs::tag::resource::custom;
+		using component_set = std::tuple<>;
+		using event_set = std::tuple<create<T>, destroy<T>>;
+	};
+
+	template<typename T>
+	struct handle_traits<T, ecs::tag::handle::custom> {
+		using generator_type = generator<T>;
+	};
+
+	template<typename T>
+	struct handle_traits<T, ecs::tag::handle::versioned> {
+		using generator_type = generator<T>;
+	};
+
+	template<typename T>
+	struct handle_traits<T, ecs::tag::handle::unversioned> {
+		using generator_type = generator<T>;
+	};
+}
+
+namespace ecs {
+	struct entity {
+		using handle_tag = ecs::tag::handle::versioned;
+		entity() = default;
+		entity(tombstone) : data(-1) { }
+		entity(uint32_t v) : data(v) { }
+		
+		constexpr uint32_t value() const { return data & 0x0000ffff; } 
+		constexpr uint32_t version() const { return data & 0xffff0000; } 
+
+	private:
+		uint32_t data;
+	};
+}
+
+
+
+/*
 #include <vector>
 #include "traits.h"
 
@@ -64,3 +117,4 @@ template<typename T, typename Alloc_T>
 bool ecs::handle_manager<T, Alloc_T>::alive(T e) const {
 	return e.version() == active[e.value()];
 }
+*/

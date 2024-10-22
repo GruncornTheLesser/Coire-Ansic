@@ -23,7 +23,7 @@ namespace ecs {
 
 namespace std {
 	template<typename T> class tuple_size<ecs::proxy_ref<T>> : public tuple_size<T> { };
-	template<size_t I, typename T> class tuple_element<I, ecs::proxy_ref<T>> : public util::copy_ignore_ref_cv<tuple_element_t<I, T>, T> { };
+	template<size_t I, typename T> class tuple_element<I, ecs::proxy_ref<T>> : public util::copy_indirect_cv<tuple_element_t<I, T>, T> { };
 	
 	template<size_t I, typename T> constexpr decltype(auto) get(ecs::proxy_ref<T>& ref) { return std::get<I>(*ref); }
 	template<size_t I, typename T> constexpr decltype(auto) get(const ecs::proxy_ref<T>& ref) { return std::get<I>(*ref); }
