@@ -114,6 +114,9 @@ namespace ecs {
 	struct exclude;
 
 	template<typename select_T, typename from_T, typename where_T, typename reg_T> 
+	struct view_iterator;
+
+	template<typename select_T, typename from_T, typename where_T, typename reg_T> 
 	struct view;
 
 	

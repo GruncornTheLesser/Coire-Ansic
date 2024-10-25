@@ -1,138 +1,142 @@
 #pragma once
-#include "proxy_ref.h"
 #include "traits.h"
-
+#include "util\proxy_ref.h"
+#include "util\tuple.h"
+#include "util\tuple_util\tuple_util.h"
 namespace ecs {
+	namespace traits {		
+		template<typename select_T>
+		using default_from_t = util::eval_t<select_T, util::filter_<traits::is_handle>::template inverse, util::get_front, util::wrap_<from>::template type>;
+
+		template<typename select_T, typename from_T>
+		using default_where_t = util::eval_t<select_T, util::filter_<traits::is_handle>::template inverse, util::filter_<
+			util::cmp::to_<ecs::manager<util::unwrap_t<from_T>>, util::cmp::is_ignore_cv_same, traits::get_component_manager>::template type>::template inverse, 
+			util::rewrap_<ecs::include>::template type, util::wrap_<ecs::where>::template type>;
+	}
+
 	template<typename ... Ts>
 	struct select {
-		using handle_type = util::eval_t<std::tuple<Ts...>, util::get_front, util::eval_if_<traits::is_handle, traits::get_handle>::template inverse, std::remove_cv>;
-		using value_type = util::eval_each_t<std::tuple<Ts...>, util::eval_if_<traits::is_handle, std::remove_cv, std::add_lvalue_reference>::template type>;
-		
-		static_assert(util::pred::allof_v<std::tuple<Ts...>, util::pred::disj_<
-			util::cmp::to_<handle_type, util::cmp::is_ignore_cv_same>::template type, 
-			util::cmp::to_<handle_type, util::cmp::is_ignore_cv_same, traits::get_handle>::template type
-			>::template type>);
+		using value_type = util::propagate_cv_each_t<select<Ts...>, util::eval_<util::eval_each_<util::eval_if_<
+			traits::is_handle, std::remove_cv, std::add_lvalue_reference>::template type>::template type, 
+			util::rewrap_<util::tuple>::template type>::template type>;
 
-		template<typename reg_T, typename from_T>
-		static inline value_type retrieve(from_T, reg_T* reg, size_t ind, handle_type ent) {
-			return { from_T::template get<Ts>(reg, ind, ent)... };
+		template<typename reg_T, typename handle_T>
+		constexpr inline value_type operator()(reg_T& reg, size_t pos, handle_T ent) const {
+			return { get<std::remove_const_t<Ts>>(reg, pos, ent)... };
 		}
-	};
-
-	template<typename T>
-	struct from {
-		using from_type = std::remove_cv_t<T>;
-		using handle_type = traits::get_handle_t<T>;
-
-		template<typename U, typename reg_T, typename ent_T> requires (!std::is_same_v<std::decay_t<U>, std::decay_t<ent_T>>)
-		static inline U& get(reg_T* reg, size_t ind, ent_T ent) {
-			return reg->template get_storage<U>()[ind];
+	private:
+		template<traits::component_class T, typename reg_T, typename handle_T>
+		constexpr static inline T& get(reg_T& reg, size_t pos, handle_T ent) {
+			return reg.template get<storage_t<T>>()[pos];
 		}
 
-		template<typename U, typename reg_T>
-		static inline U get(reg_T* reg, size_t ind, U ent) {
+		template<traits::handle_class handle_T, typename reg_T>
+		constexpr static inline handle_T get(reg_T& reg, size_t pos, handle_T ent) {
 			return ent;
 		}
 	};
 
 	template<typename ... Ts>
-	struct where { 
-		using handle_type = util::eval_t<std::tuple<Ts...>, util::get_front, traits::get_handle>;
-		
-		template<typename reg_T>
-		static inline bool validate(reg_T* reg, handle_type e) {
-			return (Ts::validate(reg, e) && ...);
-		}
-	};
-	
+	struct from {};
+
 	template<typename ... Ts>
 	struct include {
-		using handle_type = util::eval_t<std::tuple<Ts...>, util::get_front, traits::get_handle>;
-		
-		template<typename reg_T>
-		static inline bool validate(reg_T* reg, handle_type e) {
-			return (reg->template has<Ts>(e) && ...);
+		template<typename reg_T, typename handle_T>
+		constexpr inline bool operator()(reg_T& reg, handle_T ent) const {
+			return (reg.template pool<Ts>().contains(ent) && ...);
+		}
+	};
+	template<>
+	struct include<> {
+		template<typename reg_T, typename handle_T>
+		constexpr inline bool operator()(reg_T& reg, handle_T ent) const {
+			return true;
+		}
+	};
+
+
+	template<typename ... Ts>
+	struct exclude {
+		template<typename reg_T, typename handle_T>
+		constexpr inline bool operator()(reg_T& reg, handle_T ent) const {
+			return !(reg.template pool<Ts>().contains(ent) || ...);
+		}
+	};
+	template<>
+	struct exclude<> {
+		template<typename reg_T, typename handle_T>
+		constexpr inline bool operator()(reg_T& reg, handle_T ent) const {
+			return true;
 		}
 	};
 
 	template<typename ... Ts>
-	struct exclude { 
-		using handle_type = util::eval_t<std::tuple<Ts...>, util::get_front, traits::get_handle>;
-		
-		template<typename reg_T>
-		static inline bool validate(reg_T* reg, handle_type e) {
-			return !(reg->template has<Ts>(e) || ...);
+	struct where {
+		template<typename reg_T, typename handle_T>
+		constexpr inline bool operator()(reg_T& reg, handle_T handle) {
+			return (Ts{}(reg, handle) && ...);
 		}
 	};
-
-	template<typename select_T>
-	using default_from = util::eval_t<select_T, util::filter_<traits::is_handle>::template inverse, util::get_front, util::wrap_<from>::template type>;
-
-	template<typename select_T, typename from_T>
-	using default_where = util::eval_t<select_T, util::filter_<util::pred::disj_<traits::is_handle, 
-		util::cmp::to_<ecs::manager<typename from_T::from_type>, util::cmp::is_ignore_cv_same, traits::get_manager>::template type
-		>::template type>::template inverse, util::rewrap_<ecs::include>::template type>;
-};
-
+}
 namespace ecs {
 	struct view_sentinel;
-
+	
 	template<typename select_T, typename from_T, typename where_T, typename reg_T>
 	class view_iterator {
-		using handle_type = typename select_T::handle_type;
-		using from_type = typename from_T::from_type;
 	public:
+		using from_type = typename view<select_T, from_T, where_T, reg_T>::from_type;
+		using handle_type = typename view<select_T, from_T, where_T, reg_T>::handle_type;
 		using iterator_category = std::bidirectional_iterator_tag;
 		using value_type = typename select_T::value_type;
-		using reference = proxy_ref<value_type>;
+		using reference = util::proxy_ref<value_type>;
 		using difference_type = std::ptrdiff_t;
 		using sentinel_type = view_sentinel;
 		
-		view_iterator() : reg(nullptr), ind(-1), ent() { }
-		view_iterator(reg_T* reg, size_t ind) : reg(reg), ind(ind), ent() { }
-		view_iterator(const view_iterator& other) : reg(other.reg), ind(other.ind), ent(other.ent) { }
-		view_iterator& operator=(const view_iterator& other) { reg = other.reg; ind = other.ind; ent = other.ent; }
-		view_iterator(view_iterator&& other) : reg(other.reg), ind(other.ind), ent(other.ent) { }
-		view_iterator& operator=(view_iterator&& other) { reg = other.reg; ind = other.ind; ent = other.ent; }
+		view_iterator() : reg(nullptr), pos(-1), ent() { }
+		view_iterator(reg_T& reg, size_t pos) : reg(reg), pos(pos), ent() { }
+		view_iterator(const view_iterator& other) : reg(other.reg), pos(other.pos), ent(other.ent) { }
+		view_iterator& operator=(const view_iterator& other) { reg = other.reg; pos = other.pos; ent = other.ent; }
+		view_iterator(view_iterator&& other) : reg(other.reg), pos(other.pos), ent(other.ent) { }
+		view_iterator& operator=(view_iterator&& other) { reg = other.reg; pos = other.pos; ent = other.ent; }
 
 		constexpr reference operator*() const {
-			return select_T::retrieve(from_T{}, reg, ind, ent);
+			return select_T{}(reg, pos, ent);
 		}
 		
 		constexpr view_iterator& operator++() {
-			while (++ind != reg->template get_manager<from_type>().size()) {
-				ent = reg->template get_manager<from_type>()[ind];
-				if (where_T::validate(reg, ent)) 
+			while (++pos != reg.template count<from_type>()) {
+				ent = reg.template get<manager_t<from_type>>()[pos];
+				if (where_T{}(reg, ent))
 					return *this;
 			}
-			ind = -1;
+			pos = -1;
 			return *this;
 		}
 		constexpr view_iterator& operator--() {
-			while (++ind != 0) { 
-				ent = reg->template get_manager<from_type>()[ind]; 
-				if (where_T::validate(reg, ent)) 
+			while (++pos != 0) { 
+				ent = reg.template get<manager_t<from_type>>()[pos]; 
+				if (where_T{}(reg, ent))
 					return *this;
 			}
-			ind = -1;
+			pos = -1;
 			return *this;
 		}
 		
-		constexpr view_iterator operator++(int) { auto tmp = *this; ++ind; return tmp; }
-		constexpr view_iterator operator--(int) { auto tmp = *this; --ind; return tmp; }
+		constexpr view_iterator operator++(int) { auto tmp = *this; ++pos; return tmp; }
+		constexpr view_iterator operator--(int) { auto tmp = *this; --pos; return tmp; }
 
-		constexpr difference_type operator-(const view_iterator& other) const { return ind - other.ind; }
+		constexpr difference_type operator-(const view_iterator& other) const { return pos - other.pos; }
 
-		constexpr bool operator==(const view_iterator& other) const { return ind == other.ind; }
-		constexpr bool operator!=(const view_iterator& other) const { return ind != other.ind; }
+		constexpr bool operator==(const view_iterator& other) const { return pos == other.pos; }
+		constexpr bool operator!=(const view_iterator& other) const { return pos != other.pos; }
 
-		constexpr bool operator==(const view_sentinel& other) const { return ind == -1; }
-		constexpr bool operator!=(const view_sentinel& other) const { return ind != -1; }
+		constexpr bool operator==(const view_sentinel& other) const { return pos == -1; }
+		constexpr bool operator!=(const view_sentinel& other) const { return pos != -1; }
 
 	private:
 		handle_type ent;
-		size_t      ind;
-		reg_T*      reg;
+		size_t      pos;
+		reg_T&      reg;
 	};
 
 	struct view_sentinel {
@@ -148,20 +152,16 @@ namespace ecs {
 	template<typename select_T, typename from_T, typename where_T, typename reg_T>
 	class view {
 	public:
-		using handle_type = handle<util::unwrap_t<from_T>>;
+		using from_type = std::remove_const_t<util::unwrap_t<from_T>>;
+		using handle_type = traits::get_component_handle_t<from_type>;
 
-		static_assert(util::pred::allof_v<select_T, util::pred::disj_<
-				util::pred::conj_<traits::is_handle, util::cmp::to_<handle_type, util::cmp::is_ignore_cv_same>::template type>::template type, 
-				util::cmp::to_<handle_type, util::cmp::is_ignore_cv_same, traits::get_handle>::template type
-			>::template type>);
-	
 		using iterator = view_iterator<select_T, from_T, where_T, reg_T>;
-		using const_iterator = view_iterator<const select_T, from_T, where_T, reg_T>;
+		using const_iterator = view_iterator<util::eval_each_t<select_T, std::add_const>, from_T, where_T, reg_T>;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 		using sentinel_type = view_sentinel;
 
-		view(reg_T* reg) : reg(reg) { }
+		view(reg_T& reg) : reg(reg) { }
 
 		constexpr iterator begin() noexcept { return ++iterator{ reg, static_cast<size_t>(-1) }; }
 		constexpr const_iterator begin() const noexcept { return ++const_iterator{ reg, static_cast<size_t>(-1) }; }
@@ -169,13 +169,13 @@ namespace ecs {
 		constexpr view_sentinel end() noexcept { return { }; }
 		constexpr view_sentinel end() const noexcept { return { }; }
 		constexpr view_sentinel cend() const noexcept { return { }; }
-		constexpr reverse_iterator rbegin() noexcept { return --iterator{ reg, reg->template pool<from_T>().size() }; } 
-		constexpr const_reverse_iterator rbegin() const noexcept { return --const_iterator{ reg, reg->template pool<from_T>().size() }; }
-		constexpr const_reverse_iterator crbegin() const noexcept { return --const_iterator{ reg, reg->template pool<from_T>().size() }; }
+		constexpr reverse_iterator rbegin() noexcept { return --iterator{ reg, reg.template pool<from_type>().size() }; } 
+		constexpr const_reverse_iterator rbegin() const noexcept { return --const_iterator{ reg, reg.template pool<from_type>().size() }; }
+		constexpr const_reverse_iterator crbegin() const noexcept { return --const_iterator{ reg, reg.template pool<from_type>().size() }; }
 		constexpr view_sentinel rend() noexcept { return { }; }
 		constexpr view_sentinel rend() const noexcept { return { }; }
 		constexpr view_sentinel crend() const noexcept { return { }; }
 	private:
-		reg_T* reg;
+		reg_T& reg;
 	};
 }

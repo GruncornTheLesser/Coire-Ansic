@@ -15,8 +15,8 @@ namespace ecs
 	{
 		using listener_type = typename T::listener_type;
 		using invoker_type = typename T::invoker_type;
-		//static constexpr execution execution_type = typename T::execution_type;
 		static constexpr bool is_ordered = T::is_ordered;
+		//static constexpr execution execution_type = typename T::execution_type;
 	};
 
 	template<typename T> struct event_traits<T, ecs::tag::event::sync>
@@ -31,7 +31,8 @@ namespace ecs
 	{
 		using listener_type = std::function<void(const T&)>;
 		using invoker_type = invoker<T>;
-		static constexpr bool is_ordered = true;
+		static constexpr bool is_ordered = false;
+		// co-routines???
 		//static constexpr execution execution_type = execution::LAZY;
 	};
 
@@ -39,7 +40,7 @@ namespace ecs
 	{
 		using listener_type = std::function<void(const T&)>;
 		using invoker_type = invoker<T>;
-		static constexpr bool is_ordered = true;
+		static constexpr bool is_ordered = false;
 		//static constexpr execution execution_type = execution::ASYNC;
 	};
 
@@ -50,27 +51,20 @@ namespace ecs {
 	struct invoker {
 	private:
 
-		using handle_type = size_t;
+		using handle_type = uint32_t;
 		using listener_type = typename event_traits<T>::listener_type;
+		struct element_type { handle_type handle; listener_type listener = nullptr; };
 		// static constexpr execution_type = typename event_traits<T>::execution_type;
-		struct element_type {
-			handle_type handle;
-			listener_type listener = nullptr;
-		};
 	public:
 		using resource_tag = ecs::tag::resource::unrestricted;
 		
-		
-		template<typename ... arg_Ts>
-		constexpr FORCE_INLINE void operator()(arg_Ts&& ... args) { invoker(std::forward<arg_Ts>(args)...); }
-		constexpr FORCE_INLINE handle_type operator^=(listener_type&& listener) { return listen(std::forward<listener_type>(listener), true); }
-		constexpr FORCE_INLINE handle_type operator+=(listener_type&& listener) { return listen(std::forward<listener_type>(listener), false); }
-		constexpr FORCE_INLINE bool operator-=(handle_type handle) { return erase(handle); }
+		constexpr inline void operator()(const T& event) { invoke(event); }
+		constexpr inline handle_type operator^=(listener_type listener) { return listen(std::forward<listener_type>(listener), true); }
+		constexpr inline handle_type operator+=(listener_type listener) { return listen(std::forward<listener_type>(listener), false); }
+		constexpr inline bool operator-=(handle_type handle) { return detach(handle); }
 	
-		template<typename ... arg_Ts>
-		constexpr void invoke(arg_Ts&& ... args)
+		constexpr void invoke(const T& event)
 		{
-			T event{ args... };
 			int i = 0;
 			while (i < recurring)
 			{
@@ -83,10 +77,10 @@ namespace ecs {
 				data[i].listener = nullptr;
 				++i;
 			}
-			fire_once = recurring;
+			fire_once = recurring; // clear fire once sections
 		}
 
-		constexpr handle_type listen(listener_type&& listener, bool once)
+		constexpr handle_type listen(listener_type listener, bool once)
 		{
 			handle_type handle;
 			
@@ -121,13 +115,13 @@ namespace ecs {
 			}
 		}
 	
-		constexpr bool erase(handle_type handle) 
+		constexpr bool detach(handle_type handle) 
 		{
 			int i = 0;
 			while (i < fire_once && data[i].handle != handle);
 			if (i == fire_once) return false;
 			
-			if constexpr (event_traits<T>::is_ordered) 
+			if constexpr (event_traits<T>::is_ordered)
 			{
 				std::move(data.begin() + i + 1, data.begin() + fire_once, data.begin() + i);
 				if (i < recurring) --recurring;
@@ -145,6 +139,12 @@ namespace ecs {
 			return true;
 		}
 	
+		constexpr void clear() {
+			fire_once = 0;
+			recurring = 0; 
+			data.clear();
+		}
+
 	private:
 		size_t recurring = 0, fire_once = 0;
 		std::vector<element_type> data;

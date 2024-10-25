@@ -7,7 +7,11 @@
 
 
 namespace util {
-	template<typename T> struct default_delete { void operator()(void* ptr) const { return std::default_delete<T>{}(reinterpret_cast<T*>(ptr)); }};
+	template<typename T> struct default_delete {
+		void operator()(void* ptr) const { 
+			return std::default_delete<T>{}(reinterpret_cast<T*>(ptr)); 
+		}
+	};
 
 	class erased_unique_ptr
 	{
@@ -16,7 +20,7 @@ namespace util {
 		erased_unique_ptr(T* ptr);
 		template<typename T> T& get();
 	private:
-		std::unique_ptr<void, std::function<void(void*)>> ptr;
+		std::unique_ptr<void, void(void*)> ptr;
 	};
 
 	template<typename T>

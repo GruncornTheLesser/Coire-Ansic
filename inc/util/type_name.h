@@ -1,6 +1,7 @@
 #pragma once
 #include <string_view>
 
+#ifndef PF_CMD
 #if defined(__clang__)
 	#define PF_CMD __PRETTY_FUNCTION__
 	#define PF_PREFIX "std::basic_string_view<char> util::type_name() [T = "
@@ -15,6 +16,7 @@
 	#define PF_SUFFIX ">(void)"
 #else
 	#error "No support for this compiler."
+#endif
 #endif
 
 namespace util { // NOTE: when changing the namespace of this func you must update the macros for pretty function

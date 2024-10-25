@@ -28,7 +28,7 @@
 // TODO: make dispatcher use handle<>
 
 #include "inc\registry.h"
-#include "util\type_name.h"
+#include "inc\util\type_name.h"
 #include <iostream>
 #include <cassert>
 
@@ -37,58 +37,70 @@ struct B { using component_tag = ecs::tag::component::basictype; };
 struct C { using component_tag = ecs::tag::component::basictype; };
 struct D { using component_tag = ecs::tag::component::basictype; };
 
-
 static_assert(ecs::traits::is_event_v<ecs::init<A>>);
 static_assert(ecs::traits::is_resource_v<ecs::invoker_t<ecs::init<A>>>);
 
+auto log_init_func = [](const ecs::init<A>& e) { std::cout << "init A, "; };
+auto log_terminate_func = [](const ecs::terminate<A>& e) { std::cout << "terminate A, "; };
+auto log_create_func = [](const ecs::create<ecs::entity>& e) { std::cout << "create e, "; };
+auto log_destroy_func = [](const ecs::destroy<ecs::entity>& e) { std::cout << "destroy e, "; };
+
 int main() {
 	using namespace ecs;
+	
 	registry<A, B, C, D> reg;
-
-	std::cout << util::type_name<registry_traits<registry<A>>::component_set>() << std::endl;
-	std::cout << util::type_name<registry_traits<registry<A>>::handle_set>() << std::endl;
-	std::cout << util::type_name<registry_traits<registry<A>>::event_set>() << std::endl;
-	std::cout << util::type_name<registry_traits<registry<A>>::resource_set>() << std::endl;
 
 	invoker_t<init<A>>& inv = reg.on<init<A>>();
 
-	auto log_init = reg.on<init<A>>() ^= [](const init<A>& e) { std::cout << "init A fire once" << std::endl; };
-	auto log_terminate = reg.on<terminate<A>>() += [](const terminate<A>& e) { std::cout << "terminate A" << std::endl; };
-	auto log_create = reg.on<create<entity>>().listen([](const create<entity>& e) { std::cout << "create entity" << std::endl; }, false);
-	auto log_destroy = reg.on<destroy<entity>>() += [](const destroy<entity>& e) { std::cout << "destroy entity" << std::endl; };
-
-	//auto e = reg.create(); 			// create entity
-	//assert(reg.alive(e));
-
-	//assert(!reg.has<A>(e));			// assert entity does not have component
-	//reg.init<A>(e);					// create component
-	//assert(reg.has<A>(e));			// assert entity has component
-	//reg.terminate<A>(e);			// create component
-	//assert(!reg.has<A>(e));			// assert entity does not have component
+	auto log_init = reg.on<init<A>>() ^= log_init_func;
+	auto log_terminate = reg.on<terminate<A>>() += log_terminate_func;
+	auto log_create = reg.on<create<entity>>().listen(log_create_func, false);
+	auto log_destroy = reg.on<destroy<entity>>() += log_destroy_func;
 	
-	//reg.destroy(e);					// destroy entity, also terminate component
-	//assert(!reg.alive(e));
-	/*
+	std::vector<ecs::entity> ents;
+	for (int i = 0; i < 32; ++i) ents.push_back(reg.create());
+	
+	entity e1 = reg.create(); 
+	reg.destroy(e1);
+	assert(!reg.alive(e1));
+
+	for (int i = 0; i < 0xfff; ++i) reg.destroy(reg.create());
+	entity e2 = reg.create();
+	
+	assert(e1 == e2); // versions wrap around after 0xfff 65k iterations
+	assert(reg.alive(e1)); 
+	assert(reg.alive(e2));
+	
+	auto e = reg.create(); 			// create entity
+	assert(!reg.has<A>(e));
+
+	reg.init<A>(e);					// create component
+	assert(reg.has<A>(e));
+
+	reg.terminate<A>(e);			// create component
+	assert(!reg.has<A>(e));
+	
+	reg.destroy(e);					// destroy entity, also terminate component
+	assert(!reg.alive(e));
+	
 	for (auto [e, d] : reg.pool<D>()) {
+		static_assert(std::is_same_v<decltype(e), entity>);
 		static_assert(std::is_same_v<decltype(d), D&>);
-		static_assert(std::is_same_v<decltype(e), ecs::entity>);
 	}
-
 	for (auto [e, d] : reg.pool<const D>()) {
+		static_assert(std::is_same_v<decltype(e), const entity>);
 		static_assert(std::is_same_v<decltype(d), const D&>);
-		static_assert(std::is_same_v<decltype(e), const ecs::entity>);
 	}
 
-	for (auto [e, d] : reg.view<ecs::entity, D>()) {
+	for (auto [e, d] : reg.view<entity, D>()) {
+		static_assert(std::is_same_v<decltype(e), entity>);
 		static_assert(std::is_same_v<decltype(d), D&>);
-		static_assert(std::is_same_v<decltype(e), ecs::entity>);
 	}
-
-	for (auto [e, d] : reg.view<ecs::entity, const D>()) { 
+	for (auto [e, d] : reg.view<entity, const D>()) {
+		static_assert(std::is_same_v<decltype(e), entity>);
 		static_assert(std::is_same_v<decltype(d), const D&>);
-		static_assert(std::is_same_v<decltype(e), ecs::entity>);
 	}
-
+	
 	std::vector<entity> entities(64);
 	for (int i = 0; i < 64; ++i)
 		entities[i] = reg.create<entity>();
@@ -105,32 +117,32 @@ int main() {
 
 	std::cout << "---pool<A>---" << std::endl;
 	for (auto [e, a] : reg.pool<A>()) { 
-		std::cout << e.value() << ",";
+		std::cout << "entity " << ecs::handle_traits<entity>::get_index(e) << ",";
 	}
-
+	
 	std::cout << "---pool<A>---" << std::endl;
 	for (auto [e, a] : reg.pool<const A>());
 	
 	std::cout << "\n---pool<B>---" << std::endl;
-	for (auto [e, b] : reg.pool<B>()) { std::cout << e.value() << ","; }
+	for (auto [e, b] : reg.pool<B>()) { std::cout << handle_traits<entity>::get_index(e) << ","; }
 		
 	std::cout << "\n---const pool<C>---" << std::endl;
-	for (auto [e, b] : reg.pool<C>()) { std::cout << e.value() << ","; }
+	for (auto [e, b] : reg.pool<C>()) { std::cout << handle_traits<entity>::get_index(e) << ","; }
 		
 	std::cout << "\n---view<entity, A>---" << std::endl;
-	for (auto [e, a] : reg.view<ecs::entity, A>()) { std::cout << e.value() << ","; }
+	for (auto [e, a] : reg.view<ecs::entity, A>()) { std::cout << handle_traits<entity>::get_index(e) << ","; }
 	
 	std::cout << "\n---view<entity, B>---" << std::endl;
-	for (auto [e, a] : reg.view<ecs::entity, B>()) { std::cout << e.value() << ","; }
+	for (auto [e, a] : reg.view<ecs::entity, B>()) { std::cout << handle_traits<entity>::get_index(e) << ","; }
 
 	std::cout << "\n---view<entity, C>---" << std::endl;
-	for (auto [e, a] : reg.view<ecs::entity, C>()) { std::cout << e.value() << ","; }
+	for (auto [e, a] : reg.view<ecs::entity, C>()) { std::cout << handle_traits<entity>::get_index(e) << ","; }
 
 	std::cout << "\n---view<entity, A, B>---" << std::endl;
-	for (auto [e, a, b] : reg.view<entity, A, B>()) { std::cout << e.value() << ","; }
+	for (auto [e, a, b] : reg.view<entity, A, B>()) { std::cout << handle_traits<entity>::get_index(e) << ","; }
 	
 	std::cout << "\n---view<entity, B, C>---" << std::endl;
-	for (auto [e, b, c] : reg.view<entity, B, C>()) { std::cout << e.value() << ","; }
+	for (auto [e, b, c] : reg.view<entity, B, C>()) { std::cout << handle_traits<entity>::get_index(e) << ","; }
 	std::cout << std::endl;
-	*/
+
 }

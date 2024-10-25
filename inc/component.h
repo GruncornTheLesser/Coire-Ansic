@@ -6,22 +6,22 @@
 #include "resource.h"
 
 namespace ecs {
-	template<typename T> struct init { using event_tag = ecs::tag::event::sync; };
-	template<typename T> struct terminate { using event_tag = ecs::tag::event::sync; };
+	template<typename T> struct init { using event_tag = ecs::tag::event::sync; handle_t<T> e; T& component; };
+	template<typename T> struct terminate { using event_tag = ecs::tag::event::sync; handle_t<T> e; T& component; };
 
-	template<typename T> struct manager { 
+	template<typename T> struct manager : std::vector<typename handle_traits<handle_t<T>>::value_type> {
 		using resource_tag = ecs::tag::resource::custom;
 		using event_set = std::tuple<>;
 		using component_set = std::tuple<>; // must be empty
 	};
 
-	template<typename T> struct indexer { 
+	template<typename T> struct indexer : std::vector<typename handle_traits<handle_t<T>>::value_type> {
 		using resource_tag = ecs::tag::resource::custom;
 		using event_set = std::tuple<>;
 		using component_set = std::tuple<>; // must be empty
 	};
 
-	template<typename T> struct storage { 
+	template<typename T> struct storage : std::vector<T> {
 		using resource_tag = ecs::tag::resource::custom;
 		using event_set = std::tuple<init<T>, terminate<T>>;
 		using component_set = std::tuple<>; // must be empty
