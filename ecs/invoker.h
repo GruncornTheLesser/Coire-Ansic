@@ -4,68 +4,61 @@
 #include <stdint.h>
 #include "traits.h"
 
-// traits:
-// bool asynchronous = false; 
-
-namespace ecs
-{
-	// enum class execution { IMMEDIATE, ASYNC, SYNC, LAZY };
-
-	template<typename T> struct event_traits<T, ecs::tag::event::custom>
-	{
-		using listener_type = typename T::listener_type;
-		using invoker_type = typename T::invoker_type;
-		static constexpr bool is_ordered = T::is_ordered;
-		//static constexpr execution execution_type = typename T::execution_type;
+// events
+namespace ecs {
+	template<traits::resource_class T> struct acquire {
+		using ecs_tag = ecs::tag::event_sync;
+		T& value;
 	};
 
-	template<typename T> struct event_traits<T, ecs::tag::event::sync>
-	{
-		using listener_type = std::function<void(const T&)>;
-		using invoker_type = invoker<T>;
-		static constexpr bool is_ordered = true;
-		//static constexpr execution execution_type = execution::SYNC;
+	template<traits::resource_class T> struct release {
+		using ecs_tag = ecs::tag::event_sync; 
+		T& value;
 	};
 
-	template<typename T> struct event_traits<T, ecs::tag::event::lazy>
-	{
-		using listener_type = std::function<void(const T&)>;
-		using invoker_type = invoker<T>;
-		static constexpr bool is_ordered = false;
-		// co-routines???
-		//static constexpr execution execution_type = execution::LAZY;
+	template<traits::handle_class T> struct create {
+		using ecs_tag = ecs::tag::event;
+		T handle; 
 	};
 
-	template<typename T> struct event_traits<T, ecs::tag::event::async>
-	{
-		using listener_type = std::function<void(const T&)>;
-		using invoker_type = invoker<T>;
-		static constexpr bool is_ordered = false;
-		//static constexpr execution execution_type = execution::ASYNC;
+	template<traits::handle_class T> struct destroy {
+		using ecs_tag = ecs::tag::event; 
+		T handle;
+	};
+	
+	template<traits::component_class T> struct init {
+		using ecs_tag = ecs::tag::event; 
+		typename component_traits<T>::handle_type handle;
+		typename component_traits<T>::storage_type::value_type& value;
+	};
+	
+	template<traits::component_class T> struct terminate {
+		using ecs_tag = ecs::tag::event; 
+		typename component_traits<T>::handle_type handle;
+		typename component_traits<T>::storage_type::value_type& value;
 	};
 
 }
 
 namespace ecs {
 	template<typename T>
-	struct invoker {
+	struct invoker : restricted_resource {
 	private:
-
-		using handle_type = uint32_t;
+		using handle_type = event_traits<T>::handle_type;
 		using listener_type = typename event_traits<T>::listener_type;
-		struct element_type { handle_type handle; listener_type listener = nullptr; };
+		static constexpr bool strict_order = event_traits<T>::strict_order;
+
+		struct element_type { uint32_t handle; listener_type listener = nullptr; };
 		// static constexpr execution_type = typename event_traits<T>::execution_type;
 	public:
-		using resource_tag = ecs::tag::resource::unrestricted;
-		
 		constexpr inline void operator()(const T& event) { invoke(event); }
 		constexpr inline handle_type operator^=(listener_type listener) { return listen(std::forward<listener_type>(listener), true); }
 		constexpr inline handle_type operator+=(listener_type listener) { return listen(std::forward<listener_type>(listener), false); }
 		constexpr inline bool operator-=(handle_type handle) { return detach(handle); }
 	
-		constexpr void invoke(const T& event)
+		constexpr void invoke(T event)
 		{
-			int i = 0;
+			size_t i = 0;
 			while (i < recurring)
 			{
 				data[i].listener(event); // recurring listeners
@@ -82,32 +75,40 @@ namespace ecs {
 
 		constexpr handle_type listen(listener_type listener, bool once)
 		{
-			handle_type handle;
+			uint32_t handle;
 			
-			if (fire_once == data.size())
+			if (fire_once == data.size()) // storage is full
 			{
+				// allocate and generate new handle
 				handle = data.size();
 				data.resize(data.size() + 1);
 			}
 			else
 			{
-				handle = data[fire_once].handle;
+				handle = data[fire_once].handle; // reuse handle
 			}
 
 			if (once) {
+				// add listener to back of fire once partition
 				data[fire_once] = { handle, std::forward<listener_type>(listener) };
+				
+				// increment offsets
 				++fire_once;
+				
 				return handle;
 			}
 			else
 			{
-				if constexpr (event_traits<T>::is_ordered)
+				// make space for new listener
+				if constexpr (strict_order)
 					std::move_backward(data.begin() + recurring, data.begin() + fire_once, data.begin() + fire_once + 1);
 				else
 					data[fire_once] = std::move(data[recurring]);
 				
+				// add listener to back of recurring section
 				data[recurring] = { handle, std::forward<listener_type>(listener) };
-
+				
+				// increment offsets
 				++fire_once;
 				++recurring;
 
@@ -117,12 +118,15 @@ namespace ecs {
 	
 		constexpr bool detach(handle_type handle) 
 		{
+			// find index
 			int i = 0;
 			while (i < fire_once && data[i].handle != handle);
-			if (i == fire_once) return false;
 			
-			if constexpr (event_traits<T>::is_ordered)
+			if (i == fire_once) return false; // if i == end of active partition
+			
+			if constexpr (strict_order)
 			{
+				// move active after i back 1
 				std::move(data.begin() + i + 1, data.begin() + fire_once, data.begin() + i);
 				if (i < recurring) --recurring;
 				--fire_once;
@@ -130,10 +134,10 @@ namespace ecs {
 			else
 			{
 				if (i < recurring) {
-					data[i] = data[--recurring];
+					data[i] = std::move(data[--recurring]);
 					i = recurring;
 				}
-				data[i] = data[--fire_once];
+				data[i] = std::move(data[--fire_once]);
 			}
 			data[fire_once].handle = handle;
 			return true;
@@ -141,7 +145,7 @@ namespace ecs {
 	
 		constexpr void clear() {
 			fire_once = 0;
-			recurring = 0; 
+			recurring = 0;
 			data.clear();
 		}
 
