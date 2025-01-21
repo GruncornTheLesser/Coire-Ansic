@@ -1,10 +1,10 @@
 #pragma once
+#include "traits.h"
+#include <shared_mutex>
 #include <condition_variable>
 
-namespace util
+namespace ecs
 {
-	enum class priority : uint32_t { LOW = 0, MEDIUM = 1, HIGH = 2 };
-
 	struct priority_shared_mutex
 	{
 	public:
